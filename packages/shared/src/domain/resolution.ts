@@ -44,14 +44,14 @@ export function finalizeContest(s: RoomState, contestId: string, now: number): R
   if (!c || (c.status !== "war" && c.status !== "listing")) return s;
   const top = c.quotes.at(-1);
   if (!top) { // no bids: close untouched
-    return { ...s, contests: { ...s.contests, [c.id]: { ...c, status: "closed" } } };
+    return repairAll({ ...s, contests: { ...s.contests, [c.id]: { ...c, status: "closed" } } }, now);
   }
   const winner = s.managers[top.managerId];
   if (!winner) throw new Error(`unknown manager ${top.managerId}`);
   const player = s.players[c.playerId];
   if (!player) throw new Error(`unknown player ${c.playerId}`);
   const spent = cost(player, top.managerId, top.amount);
-  if (spent <= winner.spendable) return applyWin(s, c, top.managerId, top.amount, now);
+  if (spent <= winner.spendable) return repairAll(applyWin(s, c, top.managerId, top.amount, now), now);
 
   // Cannot afford -> void, fine, cascade to runner-up / prev owner / pool.
   const voided: RoomState = {
@@ -65,15 +65,47 @@ export function finalizeContest(s: RoomState, contestId: string, now: number): R
   const ru = runnerUp(c, top.managerId);
   const runnerUpManager = ru ? voided.managers[ru.managerId] : undefined;
   if (ru && runnerUpManager && cost(player, ru.managerId, ru.amount) <= runnerUpManager.spendable) {
-    return applyWin({ ...voided, contests: { ...voided.contests, [c.id]: { ...c, status: "war" } } }, c, ru.managerId, ru.amount, now);
+    return repairAll(applyWin({ ...voided, contests: { ...voided.contests, [c.id]: { ...c, status: "war" } } }, c, ru.managerId, ru.amount, now), now);
   }
   // else player stays with prev owner (already true) or pool; nothing to transfer.
-  return voided;
+  return repairAll(voided, now);
 }
 
 /** Resolve every due contest in close order. */
 export function resolveDue(s: RoomState, now: number): RoomState {
   let state = s;
   for (const c of dueContests(state, now)) state = finalizeContest(state, c.id, now);
+  return state;
+}
+
+/** Release the manager's own players (cheapest listed value first) until spendable >= 0. */
+export function coverDeficit(s: RoomState, managerId: string, now: number): RoomState {
+  let state = s;
+  const owned = () => Object.values(state.players)
+    .filter(p => p.ownerId === managerId)
+    .sort((a, b) => a.listedValue - b.listedValue);
+  for (;;) {
+    const m = state.managers[managerId];
+    if (!m) throw new Error(`unknown manager ${managerId}`);
+    if (m.spendable >= 0) break;
+    const p = owned()[0];
+    if (!p) break; // nothing left to release
+    state = {
+      ...state,
+      managers: { ...state.managers, [managerId]: { ...m, reserved: m.reserved - p.listedValue, spendable: m.spendable + p.listedValue } },
+      players: { ...state.players, [p.id]: { ...p, ownerId: null } },
+      log: [...state.log, { t: "release", at: now, managerId, playerId: p.id, toValue: p.listedValue }],
+    };
+  }
+  return state;
+}
+
+/** Repair every manager left with a negative balance (e.g. from the overcommit fine). */
+function repairAll(s: RoomState, now: number): RoomState {
+  let state = s;
+  for (const id of Object.keys(state.managers)) {
+    const m = state.managers[id];
+    if (m && m.spendable < 0) state = coverDeficit(state, id, now);
+  }
   return state;
 }
