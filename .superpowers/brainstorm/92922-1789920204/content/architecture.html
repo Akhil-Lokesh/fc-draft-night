@@ -1,0 +1,66 @@
+<h2>FC Draft Night — Architecture</h2>
+<p class="subtitle">Authoritative Node server owns all rules. Phones are thin clients. One serialized event loop makes the messy concurrent auction rules deterministic.</p>
+
+<div class="mockup">
+  <div class="mockup-header">System &amp; data flow</div>
+  <div class="mockup-body">
+    <div style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap">
+
+      <div style="flex:1;min-width:180px;border:2px solid #4a90d9;border-radius:8px;padding:12px">
+        <div class="label">Clients (5 phones + optional TV)</div>
+        <div class="placeholder">React + Vite (TS)</div>
+        <div class="placeholder">Socket.IO client</div>
+        <p style="font-size:12px;margin:6px 0 0">Join · Draft Board · Squad/Formation · Recap</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;justify-content:center;font-size:22px">⇄</div>
+
+      <div style="flex:1.4;min-width:220px;border:2px solid #5cb85c;border-radius:8px;padding:12px">
+        <div class="label">Authoritative server (Node/TS)</div>
+        <div style="border:1px dashed #888;border-radius:6px;padding:8px;margin:6px 0">
+          <b style="font-size:13px">① Single serialized command queue</b>
+          <p style="font-size:12px;margin:4px 0 0">every bid, timer-fire, listing → one ordered stream (no races)</p>
+        </div>
+        <div style="border:1px dashed #888;border-radius:6px;padding:8px;margin:6px 0">
+          <b style="font-size:13px">② Rules engine (pure / deterministic)</b>
+          <p style="font-size:12px;margin:4px 0 0">reserved/spendable · cost calc · 2-quote cap · 3-challenge cap · overcommit void + 25M fine · ordered closes · carryover</p>
+        </div>
+        <div style="border:1px dashed #888;border-radius:6px;padding:8px;margin:6px 0">
+          <b style="font-size:13px">③ Timers</b>
+          <p style="font-size:12px;margin:4px 0 0">2-min listing · 5-min anti-snipe (per contest) · 1-hr draft clock</p>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;justify-content:center;font-size:22px">⇄</div>
+
+      <div style="flex:1;min-width:160px;border:2px solid #d9a441;border-radius:8px;padding:12px">
+        <div class="label">Persistence</div>
+        <div class="placeholder">SQLite (live state)</div>
+        <div class="placeholder">crash / reconnect recovery</div>
+        <div class="placeholder">Season export/import file</div>
+      </div>
+
+    </div>
+
+    <p style="text-align:center;font-size:12px;margin:14px 0 0;color:#666">
+      command → <b>validate</b> (rules engine) → <b>apply</b> → <b>persist</b> (SQLite) → <b>broadcast state diff</b> to all phones
+    </p>
+  </div>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Deploy</div>
+    <div class="mockup-body">
+      <p style="font-size:13px">Server → Render/Fly (persistent process + volume for SQLite)</p>
+      <p style="font-size:13px">Web → Vercel</p>
+      <p style="font-size:13px">Join by room code from any phone, anywhere</p>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">Why authoritative + one queue</div>
+    <div class="mockup-body">
+      <p style="font-size:13px">"Deals honored in the order they close", void-to-runner-up, and the 25M fine only work if <b>one</b> place resolves state in a strict order. That's the queue.</p>
+    </div>
+  </div>
+</div>
