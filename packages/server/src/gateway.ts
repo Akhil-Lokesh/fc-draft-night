@@ -3,6 +3,7 @@ import { addPoolPlayer, applyCommand, type RoomState } from "@fcdn/shared";
 import type { RoomStore } from "./rooms.js";
 import type { Clock } from "./clock.js";
 import { Catalog } from "./catalog.js";
+import { exportSeasonCsv } from "./export.js";
 
 export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalog: Catalog = new Catalog()) {
   const broadcast = (code: string) => { const s = store.get(code); if (s) io.to(code).emit("state", s); };
@@ -65,6 +66,23 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
           return { state: next, events: [] };
         });
         broadcast(p.code);
+      } catch (e) {
+        socket.emit("error", (e as Error).message);
+      }
+    });
+
+    // Season handoff: export the closed room's CSV (managers get a blank finishing-position
+    // column to fill in), then re-import that filled CSV to open season N+1.
+    socket.on("exportSeason", (p: { code: string }) => {
+      const s = store.get(p.code);
+      if (!s) { socket.emit("error", "no such room"); return; }
+      const { csv, filename } = exportSeasonCsv(s);
+      socket.emit("seasonExport", { csv, filename });
+    });
+    socket.on("importSeason", async (p: { code: string; csv: string; base: number; step: number }) => {
+      try {
+        const state = await store.applyHandoff(p.code, p.csv, { base: p.base, step: p.step });
+        io.to(p.code).emit("state", state);
       } catch (e) {
         socket.emit("error", (e as Error).message);
       }
