@@ -10,6 +10,9 @@ export function openListing(
 ): { state: RoomState; contestId: string } {
   const player = s.players[a.playerId];
   if (!player) throw new Error(`unknown player ${a.playerId}`);
+  if (player.ownerId && player.ownerId !== a.managerId) {
+    throw new Error("cannot list a player owned by another manager — use openChallenge instead");
+  }
   const isOwner = player.ownerId === a.managerId;
   const type = isOwner ? "release-listing" : "pool-listing";
   const price = player.listedValue;
