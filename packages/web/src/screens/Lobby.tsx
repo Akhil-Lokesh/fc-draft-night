@@ -1,5 +1,5 @@
 import type { RoomState } from "@fcdn/shared";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { clubClass, clubLabel } from "../lib/clubs.js";
 import { money } from "../lib/format.js";
 
@@ -18,6 +18,11 @@ export function Lobby({
 }) {
   const managers = Object.values(room.managers);
   const poolCount = Object.values(room.players).filter((p) => p.ownerId === null).length;
+  const [openId, setOpenId] = useState<string | null>(null);
+  const squadOf = (mid: string) =>
+    Object.values(room.players)
+      .filter((p) => p.ownerId === mid)
+      .sort((a, b) => b.listedValue - a.listedValue);
 
   return (
     <div className="app-shell">
@@ -44,13 +49,39 @@ export function Lobby({
           <span className="mono muted" style={{ fontSize: 12 }}>{managers.length}/5</span>
         </div>
         <div className="lobby">
-          {managers.map((m) => (
-            <div key={m.id} className={`lobby-row club-chip ${clubClass(m.clubId)}`}>
-              <span className="lobby-name">{m.displayName}{m.id === myId ? " (you)" : ""}</span>
-              <span className="muted" style={{ fontSize: 12 }}>{clubLabel(m.clubId)}</span>
-              <span className="money" style={{ marginLeft: 10, fontSize: 12 }}>{money(m.spendable)}</span>
-            </div>
-          ))}
+          {managers.map((m) => {
+            const squad = squadOf(m.id);
+            const open = openId === m.id;
+            return (
+              <div key={m.id}>
+                <button
+                  type="button"
+                  className={`lobby-row lobby-row-btn club-chip ${clubClass(m.clubId)}`}
+                  aria-expanded={open}
+                  onClick={() => setOpenId(open ? null : m.id)}
+                >
+                  <span className="lobby-name">{m.displayName}{m.id === myId ? " (you)" : ""}</span>
+                  <span className="muted" style={{ fontSize: 12 }}>{clubLabel(m.clubId)}</span>
+                  <span className="money" style={{ marginLeft: 10, fontSize: 12 }}>{money(m.spendable)}</span>
+                  <span className="lobby-caret" aria-hidden="true">{open ? "▾" : "▸"}</span>
+                </button>
+                {open && (
+                  <div className="squad-reveal">
+                    <div className="mono muted squad-reveal-head">
+                      {squad.length} players · reserved <span className="money">{money(m.reserved)}</span>
+                    </div>
+                    {squad.map((p) => (
+                      <div key={p.id} className="squad-reveal-row">
+                        <span className="pill pill-pos">{p.position}</span>
+                        <span className="squad-reveal-name">{p.name}</span>
+                        <span className="money" style={{ marginLeft: "auto", fontSize: 12 }}>{money(p.listedValue)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

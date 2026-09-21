@@ -537,6 +537,23 @@ input, select { font-family: inherit; }
   border-radius: var(--r-sm);
 }
 .lobby-row .lobby-name { font-weight: 700; margin-right: auto; }
+.lobby-row-btn { width: 100%; text-align: left; color: var(--ink); cursor: pointer; transition: border-color 0.14s ease, background 0.14s ease; }
+.lobby-row-btn:hover { border-color: var(--line-strong); background: var(--pitch-100); }
+.lobby-caret { color: var(--ink-dim); font-size: 11px; width: 12px; }
+.squad-reveal {
+  margin: 6px 0 2px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--pitch-000);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  animation: rise 0.25s ease both;
+}
+.squad-reveal-head { font-size: 11px; margin-bottom: 3px; }
+.squad-reveal-row { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+.squad-reveal-name { font-weight: 600; }
 
 /* --------------------------------------------------------------- club picker */
 .club-grid { display: flex; flex-direction: column; gap: 8px; }
