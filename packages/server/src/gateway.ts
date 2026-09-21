@@ -13,7 +13,13 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
     socket.on("join", async (p: { code: string; displayName: string; clubId: string; managerId?: string }) => {
       try {
         const existing = store.get(p.code);
-        const managerId = p.managerId
+        // A client-supplied managerId is only honored if it actually belongs to an existing
+        // manager in this room AND that manager's recorded clubId matches the clubId the client
+        // also claims in the same payload. Manager ids are deterministic (`m_${clubId}`), so
+        // without this check any client could pass another manager's id and act on their behalf.
+        const claimedManager = p.managerId ? existing?.managers[p.managerId] : undefined;
+        const verifiedManagerId = claimedManager && claimedManager.clubId === p.clubId ? claimedManager.id : undefined;
+        const managerId = verifiedManagerId
           ?? (existing && Object.values(existing.managers).find(m => m.clubId === p.clubId)?.id)
           ?? (await store.join(p.code, { displayName: p.displayName, clubId: p.clubId })).managerId;
         joined = { code: p.code, managerId };
