@@ -302,6 +302,57 @@ input, select { font-family: inherit; }
 .club-barca   { --club: #4b6fd6; }
 .club-city    { --club: #64d3ff; }
 
+/* --------------------------------------------------------------- budget bars */
+.budget-bars { display: flex; flex-direction: column; gap: 11px; }
+.budget-row.is-me .budget-head { color: var(--lime); }
+.budget-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+.budget-amt { font-size: 14px; }
+.budget-amt.is-low { color: var(--alert); }
+.bar { height: 8px; border-radius: 999px; background: var(--pitch-050); overflow: hidden; border: 1px solid var(--line); }
+.bar-fill {
+  --club: var(--lime);
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--club) 60%, transparent), var(--club));
+  box-shadow: 0 0 12px -2px var(--club);
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bar-fill.is-low { --club: var(--alert); }
+
+/* --------------------------------------------------------------- challenge tracker */
+.tracker { display: flex; flex-direction: column; gap: 8px; }
+.tracker-row { display: flex; align-items: center; gap: 10px; }
+.tracker-row .club-chip { margin-right: auto; }
+.tracker-pips { display: inline-flex; gap: 4px; }
+.tracker-pips .pip { width: 14px; height: 6px; border-radius: 2px; background: var(--pitch-400); }
+.tracker-pips .pip.spent { background: var(--alert); box-shadow: 0 0 8px -1px var(--alert); }
+.tracker-count { font-size: 12px; color: var(--ink-dim); }
+.tracker-count.is-max { color: var(--alert); }
+
+/* --------------------------------------------------------------- draft log */
+.draft-log { display: flex; flex-direction: column; gap: 4px; max-height: 46vh; overflow-y: auto; }
+.log-row {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--pitch-050);
+  border-left: 2px solid var(--line-strong);
+  font-size: 13px;
+}
+.log-row b { font-weight: 800; }
+.log-icon { font-family: var(--font-mono); font-size: 12px; width: 14px; text-align: center; flex: none; opacity: 0.9; }
+.log-text { color: var(--ink-soft); }
+.tone-win { border-left-color: var(--win); }
+.tone-win .log-icon { color: var(--win); }
+.tone-live { border-left-color: var(--lime-deep); }
+.tone-live .log-icon { color: var(--lime); }
+.tone-alert { border-left-color: var(--alert); }
+.tone-alert .log-icon { color: var(--alert); }
+.tone-info { border-left-color: var(--info); }
+.tone-info .log-icon { color: var(--info); }
+
 /* --------------------------------------------------------------- pool */
 .pool { display: flex; flex-direction: column; gap: 10px; }
 .pool-search { position: sticky; top: 0; }
