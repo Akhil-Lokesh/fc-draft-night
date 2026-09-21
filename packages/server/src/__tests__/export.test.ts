@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { exportSeasonCsv } from "../export.js";
+import { exportSeasonCsv, exportSeasonXlsx, exportSeasonPdf } from "../export.js";
 import { createRoom, addManager, loadSeed } from "@fcdn/shared";
 
 function closedRoom() {
@@ -20,4 +20,16 @@ test("export includes every log entry", () => {
   const { csv } = exportSeasonCsv(closedRoom());
   expect(csv).toMatch(/haaland/);
   expect(csv).toMatch(/220/);
+});
+
+test("xlsx export produces a non-empty buffer", () => {
+  const buf = exportSeasonXlsx(closedRoom());
+  expect(Buffer.isBuffer(buf)).toBe(true);
+  expect(buf.length).toBeGreaterThan(0);
+});
+
+test("pdf export produces a non-empty buffer", async () => {
+  const buf = await exportSeasonPdf(closedRoom());
+  expect(Buffer.isBuffer(buf)).toBe(true);
+  expect(buf.length).toBeGreaterThan(0);
 });

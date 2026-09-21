@@ -3,6 +3,6 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": { "test": "vitest run", "dev": "tsx src/server.ts", "build": "tsc -p tsconfig.json" },
-  "dependencies": { "@fcdn/shared": "workspace:*", "better-sqlite3": "^11.0.0", "socket.io": "^4.7.0" },
-  "devDependencies": { "typescript": "^5.5.0", "vitest": "^2.0.0", "tsx": "^4.0.0", "socket.io-client": "^4.7.0", "@types/better-sqlite3": "^7.6.0", "@types/node": "^22.0.0" }
+  "dependencies": { "@fcdn/shared": "workspace:*", "better-sqlite3": "^11.0.0", "socket.io": "^4.7.0", "xlsx": "^0.18.5", "pdfkit": "^0.15.0" },
+  "devDependencies": { "typescript": "^5.5.0", "vitest": "^2.0.0", "tsx": "^4.0.0", "socket.io-client": "^4.7.0", "@types/better-sqlite3": "^7.6.0", "@types/node": "^22.0.0", "@types/pdfkit": "^0.13.0" }
 }

@@ -1,4 +1,6 @@
 import type { RoomState } from "@fcdn/shared";
+import * as XLSX from "xlsx";
+import PDFDocument from "pdfkit";
 
 export function exportSeasonCsv(s: RoomState): { csv: string; filename: string } {
   const lines: string[] = [];
@@ -18,4 +20,34 @@ export function exportSeasonCsv(s: RoomState): { csv: string; filename: string }
   lines.push("at,type,detail");
   for (const e of s.log) lines.push(`${e.at},${e.t},"${JSON.stringify(e).replace(/"/g, "'")}"`);
   return { csv: lines.join("\n"), filename: `fcdn-season-${s.seasonNumber}-${s.code}.csv` };
+}
+
+export function exportSeasonXlsx(s: RoomState): Buffer {
+  const wb = XLSX.utils.book_new();
+  const managers = Object.values(s.managers).map(m => ({ ...m, finishingPosition: "" }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(managers), "Managers");
+  const squads = Object.values(s.players).filter(p => p.ownerId).map(p => ({ ownerId: p.ownerId, id: p.id, name: p.name, position: p.position, listedValue: p.listedValue }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(squads), "Squads");
+  const log = s.log.map(e => ({ at: e.at, type: e.t, detail: JSON.stringify(e) }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(log), "Log");
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
+
+export function exportSeasonPdf(s: RoomState): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument();
+    const chunks: Buffer[] = [];
+    doc.on("data", (c: Buffer) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+    doc.fontSize(18).text(`FC Draft Night — Season ${s.seasonNumber}`, { align: "center" });
+    doc.moveDown();
+    doc.fontSize(14).text("Final Squads");
+    for (const m of Object.values(s.managers)) {
+      doc.moveDown(0.5).fontSize(12).text(`${m.displayName} (${m.clubId}) — spendable ${m.spendable}`);
+      const owned = Object.values(s.players).filter(p => p.ownerId === m.id);
+      for (const p of owned) doc.fontSize(10).text(`  ${p.name} (${p.position}) — ${p.listedValue}`);
+    }
+    doc.end();
+  });
 }
