@@ -1,0 +1,19 @@
+app = "fc-draft-night"
+
+[build]
+  dockerfile = "packages/server/Dockerfile"
+
+[env]
+  PORT = "8080"
+  DB_PATH = "/data/fcdn.sqlite"
+  NODE_ENV = "production"
+
+[[mounts]]
+  source = "fcdn_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  min_machines_running = 1
+  auto_stop_machines = false
