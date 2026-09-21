@@ -43,6 +43,32 @@ test("a joined client receives a state broadcast, and a challenge propagates to 
   a.close(); b.close(); io.close(); http.close();
 });
 
+test("a client can create a room over the socket and receives its code", async () => {
+  const { url, io, http } = await boot(new Db(":memory:"), new FakeClock(0));
+  const a = client(url);
+
+  const created = new Promise<any>(res => a.on("created", res));
+  a.emit("create", { totalBudget: 1500 });
+  const { code } = await created;
+
+  expect(code).toBe("TEST1");
+
+  a.close(); io.close(); http.close();
+});
+
+test("creating a room below the budget floor returns a clear error", async () => {
+  const { url, io, http } = await boot(new Db(":memory:"), new FakeClock(0));
+  const a = client(url);
+
+  const err = new Promise<string>(res => a.once("error", res));
+  a.emit("create", { totalBudget: 100 });
+  const message = await err;
+
+  expect(message).toMatch(/floor/i);
+
+  a.close(); io.close(); http.close();
+});
+
 /**
  * Bug 4 (LOW — robustness): commands sent before `join` completes must be rejected with a
  * clear, user-facing error — not throw an unguarded internal TypeError (e.g. from reading

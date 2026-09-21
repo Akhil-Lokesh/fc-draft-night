@@ -11,6 +11,18 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
   io.on("connection", (socket: Socket) => {
     let joined: { code: string; managerId: string } | null = null;
 
+    // Host creates the room and gets back a shareable code, then joins as the first manager.
+    // Kept separate from `join` so a room only ever comes into existence through this one path
+    // (join throws "no such room" for an unknown code — it never auto-creates).
+    socket.on("create", async (p: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null }) => {
+      try {
+        const { code } = await store.create(p);
+        socket.emit("created", { code });
+      } catch (e) {
+        socket.emit("error", (e as Error).message);
+      }
+    });
+
     socket.on("join", async (p: { code: string; displayName: string; clubId: string; managerId?: string }) => {
       try {
         const existing = store.get(p.code);
