@@ -88,3 +88,18 @@ export function addManager(s: RoomState, m: { id: string; displayName: string; c
   const manager: Manager = { ...m, reserved, spendable: s.totalBudget - reserved };
   return { ...s, players, managers: { ...s.managers, [m.id]: manager } };
 }
+
+export function addPoolPlayer(s: RoomState, p: SeedPlayer): RoomState {
+  if (s.players[p.id]) return s; // already present — no-op, never overwrite
+  return {
+    ...s,
+    players: {
+      ...s.players,
+      [p.id]: {
+        id: p.id, name: p.name, position: p.position,
+        listedValue: p.value, originalValue: p.value,
+        ownerId: null, lockedThisSeason: false, homeClub: p.clubId,
+      },
+    },
+  };
+}
