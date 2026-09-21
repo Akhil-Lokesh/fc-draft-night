@@ -94,10 +94,10 @@ export function makeStore(t: Transport) {
   return store;
 }
 
-/** Real socket.io transport. */
-export function connect(url: string): Transport {
-  const socket: Socket = io(url, { transports: ["websocket"] });
-  return socket as unknown as Transport;
+/** Real socket.io transport. Connection is deferred (autoConnect:false) so the caller
+ *  controls lifecycle via socket.connect()/disconnect() inside an effect. */
+export function connect(url: string): Socket {
+  return io(url, { transports: ["websocket"], autoConnect: false });
 }
 
 export type UiStore = ReturnType<typeof makeStore>;

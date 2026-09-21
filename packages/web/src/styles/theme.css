@@ -302,6 +302,106 @@ input, select { font-family: inherit; }
 .club-barca   { --club: #4b6fd6; }
 .club-city    { --club: #64d3ff; }
 
+/* --------------------------------------------------------------- landing / toast / recap */
+.landing-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 40px; }
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 92vw;
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, rgba(255,45,107,0.2), rgba(255,45,107,0.1));
+  border: 1px solid rgba(255,45,107,0.5);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  animation: slam 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.toast-x { color: var(--alert); font-size: 18px; line-height: 1; }
+.recap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; }
+.recap-cell { padding: 10px 12px; border-radius: var(--r-sm); background: var(--pitch-050); border: 1px solid var(--line); }
+.recap-name { font-weight: 800; font-size: 14px; margin: 3px 0; }
+
+/* --------------------------------------------------------------- pool builder */
+.pool-builder .input { margin-bottom: 10px; }
+.builder-results { display: flex; flex-direction: column; gap: 5px; max-height: 44vh; overflow-y: auto; }
+.builder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--pitch-050);
+  color: var(--ink);
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.builder-row.is-on { border-color: var(--lime-deep); background: color-mix(in srgb, var(--lime) 10%, var(--pitch-100)); }
+.builder-name { font-weight: 700; font-size: 14px; }
+.builder-club { font-size: 12px; }
+.builder-val { margin-left: auto; font-size: 13px; }
+.builder-mark { font-family: var(--font-mono); width: 16px; text-align: center; color: var(--lime); }
+
+/* --------------------------------------------------------------- board */
+.board { padding-top: 14px; }
+.board-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.board-clock { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.board-clock .timer { font-size: 22px; }
+.me-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, var(--pitch-300), var(--pitch-200));
+  border: 1px solid var(--line-strong);
+  margin-top: 4px;
+}
+.contest-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 420px) { .contest-grid { grid-template-columns: 1fr 1fr; } }
+.board-columns { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+.squad-strip { display: flex; flex-wrap: wrap; gap: 7px; }
+.squad-chip { display: inline-flex; align-items: center; gap: 8px; }
+
+/* --------------------------------------------------------------- challenge alert */
+.challenge-alert {
+  margin: 12px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: slam 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.alert-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, rgba(255, 45, 107, 0.16), rgba(255, 45, 107, 0.06));
+  border: 1px solid rgba(255, 45, 107, 0.5);
+  box-shadow: var(--glow-alert);
+}
+.alert-body { flex: 1; }
+.alert-flash {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--alert);
+}
+.alert-text { margin-top: 3px; font-size: 14px; }
+.alert-text b { font-weight: 800; }
+
 /* --------------------------------------------------------------- budget bars */
 .budget-bars { display: flex; flex-direction: column; gap: 11px; }
 .budget-row.is-me .budget-head { color: var(--lime); }
