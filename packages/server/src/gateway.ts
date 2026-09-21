@@ -31,8 +31,10 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
       }
     });
 
-    const cmd = (code: string, make: (s: RoomState) => Parameters<typeof applyCommand>[1]) =>
-      store.run(code, (s: RoomState) => applyCommand(s, make(s))).then(() => broadcast(code)).catch((e: Error) => socket.emit("error", e.message));
+    const cmd = (code: string, make: (s: RoomState) => Parameters<typeof applyCommand>[1]) => {
+      if (!joined) { socket.emit("error", "must join before sending commands"); return; }
+      return store.run(code, (s: RoomState) => applyCommand(s, make(s))).then(() => broadcast(code)).catch((e: Error) => socket.emit("error", e.message));
+    };
 
     socket.on("start", (p: { code: string }) => cmd(p.code, () => ({ type: "StartDraft", now: clock.now() })));
     // OpenListing = claim a pool player or release your own (server infers which from ownership).

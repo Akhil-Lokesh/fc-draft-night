@@ -42,3 +42,22 @@ test("a joined client receives a state broadcast, and a challenge propagates to 
 
   a.close(); b.close(); io.close(); http.close();
 });
+
+/**
+ * Bug 4 (LOW — robustness): commands sent before `join` completes must be rejected with a
+ * clear, user-facing error — not throw an unguarded internal TypeError (e.g. from reading
+ * `joined!.managerId` when `joined` is still null).
+ */
+test("a command sent before join completes returns a clear error, not a raw internal error", async () => {
+  const { url, io, http } = await boot(new Db(":memory:"), new FakeClock(0));
+
+  const a = client(url);
+  const err = new Promise<string>(res => a.once("error", res));
+  a.emit("bid", { code: "TEST1", contestId: "c1", amount: 100 });
+  const message = await err;
+
+  expect(message).toMatch(/join/i);
+  expect(message).not.toMatch(/cannot read propert/i);
+
+  a.close(); io.close(); http.close();
+});
