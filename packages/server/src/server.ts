@@ -16,5 +16,5 @@ const store = new RoomStore(q, db, loadSeed());
 store.loadFrom(db); // crash recovery
 const clock = new RealClock();
 attachGateway(io, store, clock);
-new Ticker(q, clock, s => io.to(s.code).emit("state", s)).start(() => q.codes());
+new Ticker(store, clock, s => io.to(s.code).emit("state", s)).start(() => q.codes());
 http.listen(Number(process.env.PORT ?? 8080));
