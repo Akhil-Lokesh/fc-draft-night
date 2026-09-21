@@ -1,5 +1,6 @@
 import { test, expect } from "vitest";
 import { exportSeasonCsv, exportSeasonXlsx, exportSeasonPdf } from "../export.js";
+import { parseFinishingOrder } from "../import.js";
 import { createRoom, addManager, loadSeed } from "@fcdn/shared";
 
 function closedRoom() {
@@ -32,4 +33,22 @@ test("pdf export produces a non-empty buffer", async () => {
   const buf = await exportSeasonPdf(closedRoom());
   expect(Buffer.isBuffer(buf)).toBe(true);
   expect(buf.length).toBeGreaterThan(0);
+});
+
+test("export/import round-trip survives a displayName containing a comma (regression: CSV corruption)", () => {
+  let s = createRoom({ code: "CD", totalBudget: 600, seed: loadSeed() });
+  s = addManager(s, { id: "m_real", displayName: "O'Brien, Jr.", clubId: "real" });
+  s = addManager(s, { id: "m_bay", displayName: "Bayern", clubId: "bayern" });
+  const closed = { ...s, status: "closed" as const, log: [] };
+
+  let { csv } = exportSeasonCsv(closed);
+  // Fill in finishing positions the same way a human editing the exported CSV would: m_real
+  // finished 2nd, m_bay finished 1st. If the comma in displayName corrupted the row, this
+  // regex (anchored on the literal manager id at line-start) will still find the right line,
+  // but the wrong column will end up holding "2"/"1" relative to what parseFinishingOrder reads.
+  csv = csv.replace(/(m_real,[^\n]*),$/m, "$1,2").replace(/(m_bay,[^\n]*),$/m, "$1,1");
+
+  const order = parseFinishingOrder(csv);
+  // worst (highest number) first: m_real finished 2nd (worse), m_bay finished 1st (better)
+  expect(order).toEqual(["m_real", "m_bay"]);
 });

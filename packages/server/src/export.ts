@@ -2,6 +2,17 @@ import type { RoomState } from "@fcdn/shared";
 import * as XLSX from "xlsx";
 import PDFDocument from "pdfkit";
 
+/**
+ * RFC 4180-style CSV field escaping: wrap the field in double quotes if it contains a comma,
+ * a double quote, or a newline; double any internal double quotes. Fields with none of those
+ * characters are returned as-is (unquoted), matching the previous unescaped format for the
+ * common case while making arbitrary user text (e.g. displayName) safe to round-trip.
+ */
+export function csvEscape(field: string): string {
+  if (/[",\n\r]/.test(field)) return `"${field.replace(/"/g, '""')}"`;
+  return field;
+}
+
 export function exportSeasonCsv(s: RoomState): { csv: string; filename: string } {
   const lines: string[] = [];
   lines.push(`# FC Draft Night season ${s.seasonNumber} — code ${s.code}`);
@@ -9,12 +20,12 @@ export function exportSeasonCsv(s: RoomState): { csv: string; filename: string }
   lines.push("## MANAGERS");
   lines.push("managerId,displayName,clubId,reserved,spendable,finishingPosition");
   for (const m of Object.values(s.managers))
-    lines.push(`${m.id},${m.displayName},${m.clubId},${m.reserved},${m.spendable},`); // blank to fill
+    lines.push(`${csvEscape(m.id)},${csvEscape(m.displayName)},${csvEscape(m.clubId)},${m.reserved},${m.spendable},`); // blank to fill
   lines.push("");
   lines.push("## SQUADS");
   lines.push("managerId,playerId,name,position,listedValue");
   for (const p of Object.values(s.players))
-    if (p.ownerId) lines.push(`${p.ownerId},${p.id},${p.name},${p.position},${p.listedValue}`);
+    if (p.ownerId) lines.push(`${csvEscape(p.ownerId)},${csvEscape(p.id)},${csvEscape(p.name)},${csvEscape(p.position)},${p.listedValue}`);
   lines.push("");
   lines.push("## LOG");
   lines.push("at,type,detail");
