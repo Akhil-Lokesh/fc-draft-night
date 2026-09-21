@@ -302,6 +302,33 @@ input, select { font-family: inherit; }
 .club-barca   { --club: #4b6fd6; }
 .club-city    { --club: #64d3ff; }
 
+/* --------------------------------------------------------------- pool */
+.pool { display: flex; flex-direction: column; gap: 10px; }
+.pool-search { position: sticky; top: 0; }
+.pool-list { display: flex; flex-direction: column; gap: 6px; max-height: 52vh; overflow-y: auto; padding-right: 2px; }
+.pool-item { border-radius: var(--r-sm); }
+.pool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--pitch-050);
+  color: var(--ink);
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.07s ease;
+}
+.pool-row:hover:not(:disabled) { background: var(--pitch-200); border-color: var(--line-strong); transform: translateX(2px); }
+.pool-row:disabled { opacity: 0.5; }
+.pool-name { font-weight: 700; font-size: 14px; margin-right: 2px; }
+.pool-tag { margin-left: auto; }
+.pool-value { font-size: 14px; min-width: 62px; text-align: right; }
+.pool-challenge { display: flex; gap: 8px; padding: 8px 4px 4px; }
+.pool-challenge .input { flex: 1; padding: 8px 10px; }
+.is-locked .pool-row { text-decoration: line-through; }
+
 /* --------------------------------------------------------------- contest card */
 .micro-label {
   font-family: var(--font-mono);
