@@ -8,6 +8,7 @@ export class Queue<S = any> {
 
   setState(code: string, s: S) { this.states.set(code, s); }
   getState(code: string): S | undefined { return this.states.get(code); }
+  codes(): string[] { return [...this.states.keys()]; }
 
   run(code: string, reducer: Reducer<S>): Promise<{ state: S; events: unknown[] }> {
     const prev = this.tails.get(code) ?? Promise.resolve();
