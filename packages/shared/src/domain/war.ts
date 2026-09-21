@@ -41,6 +41,8 @@ export function placeBid(
   if (!player) throw new Error(`unknown player ${c.playerId}`);
   const manager = s.managers[a.managerId];
   if (!manager) throw new Error(`unknown manager ${a.managerId}`);
+  if (player.lockedThisSeason && a.managerId !== player.ownerId)
+    throw new BidError("player locked this season");
 
   const used = c.quoteCounts[a.managerId] ?? 0;
   if (used >= 2) throw new BidError("quote cap reached");
