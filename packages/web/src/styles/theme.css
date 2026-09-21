@@ -302,6 +302,38 @@ input, select { font-family: inherit; }
 .club-barca   { --club: #4b6fd6; }
 .club-city    { --club: #64d3ff; }
 
+/* --------------------------------------------------------------- club picker */
+.club-grid { display: flex; flex-direction: column; gap: 8px; }
+.club-option {
+  --club: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  padding: 13px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--pitch-050);
+  color: var(--ink);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.2s ease, transform 0.08s ease;
+}
+.club-option .club-dot {
+  width: 12px; height: 12px; border-radius: 3px;
+  background: var(--club);
+  box-shadow: 0 0 12px -1px var(--club);
+  flex: none;
+}
+.club-option .club-name { font-weight: 700; }
+.club-option:hover:not(:disabled) { transform: translateX(2px); border-color: var(--club); }
+.club-option.is-selected {
+  border-color: var(--club);
+  background: color-mix(in srgb, var(--club) 12%, var(--pitch-100));
+  box-shadow: 0 0 0 1px var(--club), 0 0 26px -8px var(--club);
+}
+.club-option:disabled { opacity: 0.42; }
+.club-option:disabled .club-name { text-decoration: line-through; }
+
 /* --------------------------------------------------------------- misc fx */
 @keyframes blink { 50% { opacity: 0.25; } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
