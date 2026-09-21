@@ -52,3 +52,14 @@ test("catalog results from the server are stored for the pool builder", () => {
   t.fire("catalogResults", [{ id: "l1", name: "F. Wirtz" }]);
   expect(store.getState().catalogResults).toHaveLength(1);
 });
+
+test("re-emits join on (re)connect so a dropped socket rejoins its room", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  store.getState().join({ code: "AB", displayName: "A", clubId: "city" });
+  t.fire("joined", { managerId: "m_city" });
+  t.fire("connect", undefined); // socket.io fires this on every (re)connection
+  const last = t.emitted.at(-1);
+  expect(last?.ev).toBe("join");
+  expect(last?.p).toMatchObject({ code: "AB", clubId: "city", managerId: "m_city" });
+});

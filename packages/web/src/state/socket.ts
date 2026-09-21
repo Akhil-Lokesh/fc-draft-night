@@ -54,7 +54,17 @@ export interface UiState {
   clearError(): void;
 }
 
+const JOIN_KEY = "fcdn.join";
+function persistJoin(p: JoinPayload) { try { localStorage.setItem(JOIN_KEY, JSON.stringify(p)); } catch { /* no storage */ } }
+function loadJoin(): JoinPayload | null { try { const s = localStorage.getItem(JOIN_KEY); return s ? JSON.parse(s) : null; } catch { return null; } }
+export function clearJoin() { try { localStorage.removeItem(JOIN_KEY); } catch { /* no storage */ } }
+
 export function makeStore(t: Transport) {
+  // Remember the last join so a reconnect (HMR reload, backgrounded phone, network blip) can
+  // silently rejoin the socket.io room — otherwise the new socket id isn't in the room and the
+  // client stops receiving broadcasts (e.g. never sees the draft go live).
+  let lastJoin: JoinPayload | null = loadJoin();
+
   const store = createStore<UiState>((set, get) => {
     const code = () => get().room?.code ?? get().createdCode ?? undefined;
     return {
@@ -66,7 +76,7 @@ export function makeStore(t: Transport) {
       seasonExport: null,
 
       create: (opts) => t.emit("create", opts),
-      join: (p) => t.emit("join", p),
+      join: (p) => { lastJoin = p; persistJoin(p); t.emit("join", p); },
       start: () => t.emit("start", { code: code() }),
       openListing: (playerId) => t.emit("openListing", { code: code(), playerId }),
       challenge: (playerId, amount) => t.emit("challenge", { code: code(), playerId, amount }),
@@ -79,13 +89,27 @@ export function makeStore(t: Transport) {
     };
   });
 
+  // On every (re)connection, if we've joined before, rejoin so the fresh socket is back in the
+  // room and re-synced. On the initial page load this also resumes an in-progress draft.
+  t.on("connect", () => {
+    if (!lastJoin) return;
+    const managerId = lastJoin.managerId ?? savedManagerId() ?? undefined;
+    t.emit("join", managerId ? { ...lastJoin, managerId } : lastJoin);
+  });
   t.on("state", (room: RoomState) => store.setState({ room }));
   t.on("created", ({ code }: { code: string }) => store.setState({ createdCode: code }));
   t.on("joined", ({ managerId }: { managerId: string }) => {
     store.setState({ managerId });
+    // Remember the assigned managerId in-memory (and in storage) so a later reconnect rejoins
+    // as the SAME manager, not as a new one. In-memory is the source of truth — storage may be
+    // absent (SSR, private mode, jsdom).
+    if (lastJoin) { lastJoin = { ...lastJoin, managerId }; persistJoin(lastJoin); }
     try { localStorage.setItem("fcdn.managerId", managerId); } catch { /* SSR / no storage */ }
   });
-  t.on("error", (message: string) => store.setState({ error: message }));
+  t.on("error", (message: string) => {
+    if (/no such room/i.test(message)) { lastJoin = null; clearJoin(); } // stale room — don't loop on rejoin
+    store.setState({ error: message });
+  });
   t.on("catalogResults", (results: SeedPlayer[]) =>
     store.setState({ catalogResults: results as unknown as CatalogPlayer[] }));
   t.on("seasonExport", (payload: { csv: string; filename: string }) =>
