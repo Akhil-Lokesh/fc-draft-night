@@ -5,7 +5,7 @@ import type { RoomState, Contest } from "../domain/types.js";
 function stateWith(contests: Contest[], draftClockMs = 3_600_000): RoomState {
   return {
     code: "AB", totalBudget: 600, quoteTimerMs: 300_000, draftClockMs,
-    squadSizeCap: null, seasonNumber: 1, status: "live", startedAt: 0,
+    squadSizeCap: null, capacity: 5, seasonNumber: 1, status: "live", startedAt: 0,
     managers: {}, players: {},
     contests: Object.fromEntries(contests.map(c => [c.id, c])),
     challenges: {}, log: [], seq: contests.length,

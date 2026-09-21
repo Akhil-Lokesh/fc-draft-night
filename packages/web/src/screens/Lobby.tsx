@@ -46,7 +46,7 @@ export function Lobby({
       <div className="panel rise" style={{ marginBottom: 14, animationDelay: "0.05s" }}>
         <div className="panel-head">
           <span className="panel-title">Managers</span>
-          <span className="mono muted" style={{ fontSize: 12 }}>{managers.length}/5</span>
+          <span className="mono muted" style={{ fontSize: 12 }}>{managers.length}/{room.capacity}</span>
         </div>
         <div className="lobby">
           {managers.map((m) => {

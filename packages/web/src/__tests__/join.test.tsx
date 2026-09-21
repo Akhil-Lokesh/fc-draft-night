@@ -18,3 +18,10 @@ test("a taken club is disabled", () => {
   render(<Join join={() => {}} takenClubs={["real"]} />);
   expect(screen.getByRole("button", { name: /real madrid/i })).toBeDisabled();
 });
+
+test("a full room disables every club and blocks joining", () => {
+  render(<Join join={() => {}} takenClubs={["real"]} capacity={1} managerCount={1} />);
+  expect(screen.getByRole("button", { name: /real madrid/i })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /arsenal/i })).toBeDisabled();
+  expect(screen.getByText(/room is full/i)).toBeTruthy();
+});

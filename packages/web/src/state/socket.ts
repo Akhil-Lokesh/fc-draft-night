@@ -13,6 +13,13 @@ export interface CreateOpts {
   totalBudget: number;
   quoteTimerMs?: number;
   squadSizeCap?: number | null;
+  capacity?: number;
+}
+
+export interface RoomPeek {
+  capacity: number;
+  takenClubs: string[];
+  managerCount: number;
 }
 
 export interface JoinPayload {
@@ -38,9 +45,11 @@ export interface UiState {
   createdCode: string | null;
   catalogResults: CatalogPlayer[];
   seasonExport: { csv: string; filename: string } | null;
+  roomPeek: RoomPeek | null;
 
   create(opts: CreateOpts): void;
   join(p: JoinPayload): void;
+  peekRoom(code: string): void;
   start(): void;
   /** Claim an unowned pool player, or release one of your own — server infers which from ownership. */
   openListing(playerId: string): void;
@@ -74,9 +83,11 @@ export function makeStore(t: Transport) {
       createdCode: null,
       catalogResults: [],
       seasonExport: null,
+      roomPeek: null,
 
       create: (opts) => t.emit("create", opts),
       join: (p) => { lastJoin = p; persistJoin(p); t.emit("join", p); },
+      peekRoom: (code) => t.emit("peekRoom", { code }),
       start: () => t.emit("start", { code: code() }),
       openListing: (playerId) => t.emit("openListing", { code: code(), playerId }),
       challenge: (playerId, amount) => t.emit("challenge", { code: code(), playerId, amount }),
@@ -112,6 +123,7 @@ export function makeStore(t: Transport) {
   });
   t.on("catalogResults", (results: SeedPlayer[]) =>
     store.setState({ catalogResults: results as unknown as CatalogPlayer[] }));
+  t.on("roomPeek", (peek: RoomPeek) => store.setState({ roomPeek: peek }));
   t.on("seasonExport", (payload: { csv: string; filename: string }) =>
     store.setState({ seasonExport: payload }));
 

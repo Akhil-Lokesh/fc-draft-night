@@ -6,17 +6,25 @@ export interface JoinFields { code: string; displayName: string; clubId: string;
 export function Join({
   join,
   takenClubs,
+  capacity,
+  managerCount,
   initialCode = "",
+  onCodeChange,
 }: {
   join: (p: JoinFields) => void;
   takenClubs: string[];
+  capacity?: number;
+  managerCount?: number;
   initialCode?: string;
+  /** Fires as the room code changes, so the caller can peek live capacity/taken-clubs before joining. */
+  onCodeChange?: (code: string) => void;
 }) {
   const [code, setCode] = useState(initialCode);
   const [displayName, setName] = useState("");
   const [clubId, setClub] = useState<string | null>(null);
+  const roomFull = capacity !== undefined && managerCount !== undefined && managerCount >= capacity;
 
-  const ready = code.trim().length > 0 && displayName.trim().length > 0 && clubId !== null;
+  const ready = !roomFull && code.trim().length > 0 && displayName.trim().length > 0 && clubId !== null;
   const submit = () => {
     if (!ready) return;
     join({ code: code.trim().toUpperCase(), displayName: displayName.trim(), clubId: clubId! });
@@ -42,7 +50,11 @@ export function Join({
             value={code}
             autoComplete="off"
             placeholder="XXXX"
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onChange={(e) => {
+              const next = e.target.value.toUpperCase();
+              setCode(next);
+              onCodeChange?.(next);
+            }}
           />
         </div>
 
@@ -61,7 +73,8 @@ export function Join({
           <span className="label">Pick your club</span>
           <div className="club-grid">
             {CLUBS.map((c) => {
-              const taken = takenClubs.includes(c.id);
+              const clubTaken = takenClubs.includes(c.id);
+              const taken = roomFull || clubTaken;
               const selected = clubId === c.id;
               return (
                 <button
@@ -74,12 +87,14 @@ export function Join({
                 >
                   <span className="club-dot" />
                   <span className="club-name">{c.label}</span>
-                  {taken && <span className="pill" style={{ marginLeft: "auto" }}>taken</span>}
+                  {taken && <span className="pill" style={{ marginLeft: "auto" }}>{clubTaken ? "taken" : "full"}</span>}
                 </button>
               );
             })}
           </div>
         </div>
+
+        {roomFull && <div className="inline-error" role="alert">This room is full.</div>}
 
         <button className="btn btn-primary btn-block" disabled={!ready} onClick={submit}>
           Join

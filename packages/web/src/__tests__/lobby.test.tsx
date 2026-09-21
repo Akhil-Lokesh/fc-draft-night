@@ -5,7 +5,7 @@ import { Lobby } from "../screens/Lobby.js";
 
 const room: any = {
   code: "R0002", totalBudget: 1500, quoteTimerMs: 180_000, draftClockMs: 3_600_000, squadSizeCap: null,
-  seasonNumber: 1, status: "setup", startedAt: null,
+  capacity: 5, seasonNumber: 1, status: "setup", startedAt: null,
   managers: {
     m_arsenal: { id: "m_arsenal", displayName: "loki", clubId: "arsenal", reserved: 1145, spendable: 355 },
   },

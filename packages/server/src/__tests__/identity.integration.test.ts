@@ -48,3 +48,24 @@ test("a client cannot spoof another manager's identity by supplying their manage
 
   a.close(); b.close(); io.close(); http.close();
 });
+
+/**
+ * A genuinely different person must not be silently fused into an existing manager just
+ * because they pick the same club with no managerId — that would let two people share one
+ * squad/budget unknowingly. Only the same displayName (a same-person reconnect from a fresh
+ * device/cleared storage) may reattach without a managerId; anyone else gets "club taken".
+ */
+test("two different people cannot both take the same club", async () => {
+  const { store, url, io, http } = await boot(new Db(":memory:"), new FakeClock(0));
+  await store.create({ totalBudget: 1500 });
+  const a = client(url);
+  await new Promise<any>(res => a.once("joined", res).emit("join", { code: "TEST1", displayName: "A", clubId: "real" }));
+
+  const b = client(url);
+  const bErr = new Promise<string>(res => b.once("error", res));
+  b.emit("join", { code: "TEST1", displayName: "Someone Else", clubId: "real" });
+  const message = await bErr;
+  expect(message).toMatch(/taken/i);
+
+  a.close(); b.close(); io.close(); http.close();
+});

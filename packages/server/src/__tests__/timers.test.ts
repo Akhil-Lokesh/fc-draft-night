@@ -9,7 +9,7 @@ import type { RoomState } from "@fcdn/shared";
 function roomWithDueWar(): RoomState {
   return {
     code: "AB", totalBudget: 600, quoteTimerMs: 300_000, draftClockMs: 3_600_000, squadSizeCap: null,
-    seasonNumber: 1, status: "live", startedAt: 0,
+    capacity: 5, seasonNumber: 1, status: "live", startedAt: 0,
     managers: { city: { id: "city", displayName: "City", clubId: "city", reserved: 0, spendable: 300 } },
     players: { haaland: { id: "haaland", name: "Haaland", position: "FWD", listedValue: 180, originalValue: 180, ownerId: null, lockedThisSeason: false, homeClub: null } },
     contests: {

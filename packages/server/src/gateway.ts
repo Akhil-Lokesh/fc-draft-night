@@ -14,7 +14,7 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
     // Host creates the room and gets back a shareable code, then joins as the first manager.
     // Kept separate from `join` so a room only ever comes into existence through this one path
     // (join throws "no such room" for an unknown code — it never auto-creates).
-    socket.on("create", async (p: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null }) => {
+    socket.on("create", async (p: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number }) => {
       try {
         const { code } = await store.create(p);
         socket.emit("created", { code });
@@ -32,8 +32,13 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
         // without this check any client could pass another manager's id and act on their behalf.
         const claimedManager = p.managerId ? existing?.managers[p.managerId] : undefined;
         const verifiedManagerId = claimedManager && claimedManager.clubId === p.clubId ? claimedManager.id : undefined;
+        // No managerId (e.g. a fresh device/cleared storage): only reattach to the existing
+        // manager on that club if the display name also matches — a real second person picking
+        // an already-taken club must hit "club taken" below, not get silently fused into it.
+        const sameClubHolder = existing && Object.values(existing.managers).find(m => m.clubId === p.clubId);
+        const reconnectByName = sameClubHolder && sameClubHolder.displayName === p.displayName ? sameClubHolder.id : undefined;
         const managerId = verifiedManagerId
-          ?? (existing && Object.values(existing.managers).find(m => m.clubId === p.clubId)?.id)
+          ?? reconnectByName
           ?? (await store.join(p.code, { displayName: p.displayName, clubId: p.clubId })).managerId;
         joined = { code: p.code, managerId };
         socket.join(p.code);
@@ -42,6 +47,18 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
       } catch (e) {
         socket.emit("error", (e as Error).message);
       }
+    });
+
+    // Lets the Join screen show live capacity/taken-clubs before the player has actually
+    // joined (and thus before their socket is in the room and would receive `state`).
+    socket.on("peekRoom", (p: { code: string }) => {
+      const existing = store.get(p.code);
+      if (!existing) { socket.emit("error", "no such room"); return; }
+      socket.emit("roomPeek", {
+        capacity: existing.capacity,
+        takenClubs: Object.values(existing.managers).map(m => m.clubId),
+        managerCount: Object.keys(existing.managers).length,
+      });
     });
 
     const cmd = (code: string, make: (s: RoomState) => Parameters<typeof applyCommand>[1]) => {

@@ -5,6 +5,7 @@ export interface StartConfig {
   totalBudget: number;
   quoteTimerMs: number;
   squadSizeCap: number | null;
+  capacity?: number;
 }
 
 const TIMER_OPTIONS = [1, 2, 3, 5];
@@ -13,6 +14,7 @@ export function Setup({
   floor,
   onStart,
   managerCount,
+  maxCapacity = 5,
   code,
   joined = [],
   startLabel = "Start draft",
@@ -21,6 +23,7 @@ export function Setup({
   floor: number;
   onStart: (cfg: StartConfig) => void;
   managerCount: number;
+  maxCapacity?: number;
   code?: string;
   joined?: { id: string; displayName: string; clubId: string }[];
   startLabel?: string;
@@ -29,7 +32,9 @@ export function Setup({
   const [budget, setBudget] = useState(String(floor));
   const [timerMin, setTimerMin] = useState(5);
   const [cap, setCap] = useState("");
+  const [capacity, setCapacity] = useState(maxCapacity);
   const [error, setError] = useState<string | null>(null);
+  const capacityOptions = Array.from({ length: maxCapacity - 1 }, (_, i) => i + 2); // 2..maxCapacity
 
   // Tolerate a stray "€"/"M"/spaces a host may type next to the number — parse the digits only.
   const parseAmount = (raw: string): number => Number(raw.replace(/[^\d.]/g, ""));
@@ -45,6 +50,7 @@ export function Setup({
       totalBudget: total,
       quoteTimerMs: timerMin * 60_000,
       squadSizeCap: cap.trim() ? parseAmount(cap) : null,
+      capacity,
     });
   };
 
@@ -84,6 +90,23 @@ export function Setup({
           />
           <p className="muted mono" style={{ margin: "7px 0 0", fontSize: 12 }}>
             Floor €{floor}M — the priciest real squad must fit.
+          </p>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="setup-capacity">How many managers?</label>
+          <select
+            id="setup-capacity"
+            className="input mono"
+            value={capacity}
+            onChange={(e) => setCapacity(Number(e.target.value))}
+          >
+            {capacityOptions.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <p className="muted mono" style={{ margin: "7px 0 0", fontSize: 12 }}>
+            One real club's squad per manager — no duplicates, no international sides.
           </p>
         </div>
 

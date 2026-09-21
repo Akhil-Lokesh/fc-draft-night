@@ -63,3 +63,12 @@ test("re-emits join on (re)connect so a dropped socket rejoins its room", () => 
   expect(last?.ev).toBe("join");
   expect(last?.p).toMatchObject({ code: "AB", clubId: "city", managerId: "m_city" });
 });
+
+test("peekRoom emits a peek and stores the server's roomPeek reply", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  store.getState().peekRoom("AB");
+  expect(t.emitted.at(-1)).toMatchObject({ ev: "peekRoom", p: { code: "AB" } });
+  t.fire("roomPeek", { capacity: 3, takenClubs: ["real"], managerCount: 1 });
+  expect(store.getState().roomPeek).toEqual({ capacity: 3, takenClubs: ["real"], managerCount: 1 });
+});

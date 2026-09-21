@@ -15,3 +15,10 @@ test("adding a manager reserves their club's squad value and sets spendable", ()
   expect(owned.length).toBeGreaterThan(0);
   expect(owned.every(p => p.listedValue === p.originalValue)).toBe(true);
 });
+
+test("createRoom defaults capacity to 5 and honors an explicit capacity", () => {
+  const s = createRoom({ code: "ABCD", totalBudget: 600, seed: fixtureSeed() });
+  expect(s.capacity).toBe(5);
+  const s2 = createRoom({ code: "ABCD", totalBudget: 600, seed: fixtureSeed(), capacity: 3 });
+  expect(s2.capacity).toBe(3);
+});

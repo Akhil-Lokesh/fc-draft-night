@@ -40,6 +40,7 @@ export interface RoomState {
   code: string; totalBudget: number;
   quoteTimerMs: number; draftClockMs: number;
   squadSizeCap: number | null;
+  capacity: number;
   seasonNumber: number;
   status: "setup" | "live" | "closed";
   startedAt: number | null;
@@ -56,7 +57,7 @@ export const LISTING_MS = 120_000;         // 2-minute listing window
 
 export function createRoom(opts: {
   code: string; totalBudget: number; seed: SeedPlayer[];
-  quoteTimerMs?: number; squadSizeCap?: number | null;
+  quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number;
 }): RoomState {
   const players: Record<string, Player> = {};
   for (const p of opts.seed) {
@@ -71,6 +72,7 @@ export function createRoom(opts: {
     code: opts.code, totalBudget: opts.totalBudget,
     quoteTimerMs: opts.quoteTimerMs ?? 300_000, draftClockMs: 3_600_000,
     squadSizeCap: opts.squadSizeCap ?? null,
+    capacity: opts.capacity ?? 5,
     seasonNumber: 1, status: "setup", startedAt: null,
     managers: {}, players, contests: {}, challenges: {}, log: [], seq: 0,
   };

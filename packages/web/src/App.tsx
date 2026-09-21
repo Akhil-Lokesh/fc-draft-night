@@ -7,7 +7,7 @@ import { Setup } from "./screens/Setup.js";
 import { Lobby } from "./screens/Lobby.js";
 import { DraftBoard } from "./screens/DraftBoard.js";
 import { PoolBuilder } from "./components/PoolBuilder.js";
-import { clubClass, clubLabel } from "./lib/clubs.js";
+import { clubClass, clubLabel, CLUBS } from "./lib/clubs.js";
 import { money } from "./lib/format.js";
 
 const FLOOR = budgetFloor(loadSeed());
@@ -34,6 +34,7 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
   const error = useUi(store, (s) => s.error);
   const catalogResults = useUi(store, (s) => s.catalogResults);
   const seasonExport = useUi(store, (s) => s.seasonExport);
+  const roomPeek = useUi(store, (s) => s.roomPeek);
 
   // When the server sends back a season CSV, hand it to the browser as a download.
   useEffect(() => {
@@ -58,9 +59,13 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
     return () => clearInterval(id);
   }, []);
 
-  // After the host creates the room, send them to the identity step (prefilled with the code).
+  // After the host creates the room, send them to the identity step (prefilled with the code),
+  // and peek it immediately so the club grid reflects live capacity/taken-clubs on first render.
   useEffect(() => {
-    if (createdCode && !managerId && !room) setMode("join");
+    if (createdCode && !managerId && !room) {
+      setMode("join");
+      store.getState().peekRoom(createdCode);
+    }
   }, [createdCode, managerId, room]);
 
   const doJoin = (p: JoinFields) => {
@@ -110,12 +115,22 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
       <Setup
         floor={FLOOR}
         managerCount={5}
+        maxCapacity={CLUBS.length}
         startLabel="Create room"
         onStart={(cfg) => { setIAmHost(true); store.getState().create(cfg); }}
       />
     );
   } else if (mode === "join") {
-    screen = <Join join={doJoin} takenClubs={[]} initialCode={createdCode || urlCode} />;
+    screen = (
+      <Join
+        join={doJoin}
+        takenClubs={roomPeek?.takenClubs ?? []}
+        capacity={roomPeek?.capacity}
+        managerCount={roomPeek?.managerCount}
+        initialCode={createdCode || urlCode}
+        onCodeChange={(code) => { if (code.trim().length > 0) store.getState().peekRoom(code.trim()); }}
+      />
+    );
   } else {
     screen = <Landing onHost={() => setMode("host-config")} onJoin={() => setMode("join")} />;
   }
