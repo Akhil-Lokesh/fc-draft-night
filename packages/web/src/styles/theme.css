@@ -302,6 +302,39 @@ input, select { font-family: inherit; }
 .club-barca   { --club: #4b6fd6; }
 .club-city    { --club: #64d3ff; }
 
+/* --------------------------------------------------------------- setup */
+.field-row { display: flex; gap: 12px; }
+.inline-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 45, 107, 0.1);
+  border: 1px solid rgba(255, 45, 107, 0.4);
+  color: var(--alert-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+.share-panel { text-align: center; }
+.room-code {
+  font-family: var(--font-display);
+  font-size: 46px;
+  letter-spacing: 0.16em;
+  color: var(--lime);
+  text-shadow: 0 0 30px rgba(206, 255, 26, 0.4);
+  margin-top: 4px;
+}
+.lobby { display: flex; flex-direction: column; gap: 8px; }
+.lobby-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--pitch-050);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.lobby-row .lobby-name { font-weight: 700; margin-right: auto; }
+
 /* --------------------------------------------------------------- club picker */
 .club-grid { display: flex; flex-direction: column; gap: 8px; }
 .club-option {
