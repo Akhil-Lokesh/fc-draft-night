@@ -1,4 +1,6 @@
 import { test, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { Catalog } from "../catalog.js";
 
 test("search ranks by value descending and excludes the five clubs' players", () => {
@@ -22,4 +24,22 @@ test("byIds returns players matching the given ids", () => {
   const byIds = c.byIds([found[0]!.id]);
   expect(byIds.length).toBe(1);
   expect(byIds[0]!.id).toBe(found[0]!.id);
+});
+
+/**
+ * Bug 3 (MEDIUM — defense in depth): byIds must enforce the same pool-eligibility guarantee
+ * as search (clubId === null), even when a caller requests a club-owned player by its exact
+ * id. Today this is only harmless by accident of a different module's invariant (addPoolPlayer
+ * is a no-op for ids that already exist in room state) — byIds/setPool must guarantee it
+ * themselves, not rely on that.
+ */
+test("byIds excludes club-owned players even when requested by exact id", () => {
+  const rawPath = fileURLToPath(new URL("../data/fc26-catalog.json", import.meta.url));
+  const raw = JSON.parse(readFileSync(rawPath, "utf-8")) as { id: string; clubId: string | null }[];
+  const clubPlayer = raw.find(p => p.clubId === "real");
+  expect(clubPlayer).toBeTruthy();
+
+  const c = new Catalog();
+  const byIds = c.byIds([clubPlayer!.id]);
+  expect(byIds).toEqual([]);
 });
