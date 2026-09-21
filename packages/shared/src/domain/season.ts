@@ -1,4 +1,5 @@
 import type { RoomState } from "./types.js";
+import { OVERCOMMIT_FINE } from "./types.js";
 import { coverDeficit } from "./resolution.js";
 
 /** finishingOrder is worst-first; each step up the table adds `step`. */
@@ -40,10 +41,19 @@ export function startNextSeason(
     managers[id] = { ...manager, reserved, spendable: newBase + Math.max(0, leftover) - reserved };
   }
   state = { ...state, managers };
-  // reserved-overflow unwind (§4.9): any manager left negative releases players + fine handled by coverDeficit
-  for (const id of Object.keys(managers)) {
+  // reserved-overflow unwind (§4.9): any manager left negative resolves like a negative balance —
+  // the flat 25M fine applies first (mirroring finalizeContest's overcommit-void path), then
+  // coverDeficit releases players (possibly one more, to also cover the fine itself) until solvent.
+  for (const id of Object.keys(state.managers)) {
     const mgr = state.managers[id];
-    if (mgr && mgr.spendable < 0) state = coverDeficit(state, id, 0);
+    if (mgr && mgr.spendable < 0) {
+      state = {
+        ...state,
+        managers: { ...state.managers, [id]: { ...mgr, spendable: mgr.spendable - OVERCOMMIT_FINE } },
+        log: [...state.log, { t: "fine", at: 0, managerId: id, amount: OVERCOMMIT_FINE }],
+      };
+      state = coverDeficit(state, id, 0);
+    }
   }
   return state;
 }
