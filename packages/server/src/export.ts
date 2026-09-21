@@ -29,7 +29,7 @@ export function exportSeasonCsv(s: RoomState): { csv: string; filename: string }
   lines.push("");
   lines.push("## LOG");
   lines.push("at,type,detail");
-  for (const e of s.log) lines.push(`${e.at},${e.t},"${JSON.stringify(e).replace(/"/g, "'")}"`);
+  for (const e of s.log) lines.push(`${e.at},${e.t},${csvEscape(JSON.stringify(e))}`);
   return { csv: lines.join("\n"), filename: `fcdn-season-${s.seasonNumber}-${s.code}.csv` };
 }
 

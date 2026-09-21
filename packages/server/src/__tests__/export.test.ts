@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
 import { exportSeasonCsv, exportSeasonXlsx, exportSeasonPdf } from "../export.js";
-import { parseFinishingOrder } from "../import.js";
+import { parseFinishingOrder, parseCsvLine } from "../import.js";
 import { createRoom, addManager, loadSeed } from "@fcdn/shared";
 
 function closedRoom() {
@@ -51,4 +51,26 @@ test("export/import round-trip survives a displayName containing a comma (regres
   const order = parseFinishingOrder(csv);
   // worst (highest number) first: m_real finished 2nd (worse), m_bay finished 1st (better)
   expect(order).toEqual(["m_real", "m_bay"]);
+});
+
+test("LOG column properly CSV-escapes its JSON payload and round-trips through JSON.parse (regression: lossy quote-substitution)", () => {
+  let s = createRoom({ code: "EF", totalBudget: 600, seed: loadSeed() });
+  s = addManager(s, { id: "m_real", displayName: "Real", clubId: "real" });
+  // A reason containing both a double quote and a comma — the old `.replace(/"/g, "'")` hack
+  // would mangle the quote into a literal apostrophe, making the column neither valid JSON nor
+  // unambiguous CSV.
+  const entry = { t: "void" as const, at: 12, contestId: "c1", managerId: "m_real", reason: 'flagged as "suspicious", pending review' };
+  const closed = { ...s, status: "closed" as const, log: [entry] };
+
+  const { csv } = exportSeasonCsv(closed);
+  const logLineIdx = csv.split("\n").findIndex(l => l.startsWith("12,void,"));
+  expect(logLineIdx).toBeGreaterThanOrEqual(0);
+  const line = csv.split("\n")[logLineIdx]!;
+
+  // Parse the line as CSV (respecting quoting), then JSON.parse the reconstructed detail field.
+  const cols = parseCsvLine(line);
+  expect(cols).toHaveLength(3); // at, type, detail — not split into extra columns by the embedded comma/quotes
+  const detail = cols[2]!;
+  const parsed = JSON.parse(detail);
+  expect(parsed).toEqual(entry);
 });
