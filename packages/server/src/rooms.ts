@@ -1,6 +1,7 @@
-import { createRoom, addManager, budgetFloor, type RoomState, type SeedPlayer } from "@fcdn/shared";
+import { createRoom, addManager, budgetFloor, startNextSeason, type RoomState, type SeedPlayer } from "@fcdn/shared";
 import type { Queue } from "./queue.js";
 import type { Db } from "./db.js";
+import { parseFinishingOrder } from "./import.js";
 
 let counter = 0;
 function defaultCode(): string {
@@ -37,6 +38,13 @@ export class RoomStore {
   /** Run an arbitrary command/reducer against this room through the queue, without reaching into private internals. */
   async run(code: string, reducer: (s: RoomState) => { state: RoomState; events: unknown[] }): Promise<RoomState> {
     const { state } = await this.q.run(code, reducer);
+    this.db.save(state);
+    return state;
+  }
+
+  async applyHandoff(code: string, csv: string, opts: { base: number; step: number }): Promise<RoomState> {
+    const finishingOrder = parseFinishingOrder(csv);
+    const { state } = await this.q.run(code, (s) => ({ state: startNextSeason(s, { finishingOrder, ...opts }), events: [] }));
     this.db.save(state);
     return state;
   }
