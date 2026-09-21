@@ -1,27 +1,11 @@
 import { test, expect } from "vitest";
-import { createServer } from "node:http";
-import { Server } from "socket.io";
 import { io as client } from "socket.io-client";
-import { attachGateway } from "../gateway.js";
-import { RoomStore } from "../rooms.js";
-import { Queue } from "../queue.js";
 import { Db } from "../db.js";
 import { FakeClock } from "../clock.js";
-import { loadSeed, type RoomState } from "@fcdn/shared";
-
-async function boot() {
-  const http = createServer();
-  const io = new Server(http, { cors: { origin: "*" } });
-  const q = new Queue<RoomState>();
-  const store = new RoomStore(q, new Db(":memory:"), loadSeed(), () => "TEST1");
-  attachGateway(io, store, new FakeClock(0));
-  await new Promise<void>(r => http.listen(0, r));
-  const port = (http.address() as any).port;
-  return { http, io, store, url: `http://localhost:${port}` };
-}
+import { boot } from "./helpers.js";
 
 test("a joined client receives a state broadcast, and a challenge propagates to a second client", async () => {
-  const { store, url, http, io } = await boot();
+  const { store, url, http, io } = await boot(new Db(":memory:"), new FakeClock(0));
   await store.create({ totalBudget: 1500 }); // real FC26 dataset's budget floor
   const a = client(url), b = client(url);
 
