@@ -1,6 +1,8 @@
 # FC Draft Night — Implementation Roadmap
 
 > Master roadmap. The build ships as six sequential plans; each produces working, testable software on its own. Full bite-sized detail lives in the per-phase plan files. Plan 1 is written in full; Plans 2–6 are outlined here and expanded to full detail when reached.
+>
+> **Status (as of the non-frontend execution pass):** Plans 1 and 2 are fully done and independently reviewed — `@fcdn/shared` (40 tests) and `@fcdn/server` (32 tests), both `pnpm -r build` clean. Plan 4 Task 1 (analytics), Plan 5 Tasks 1–3 (export/import/handoff), and Plan 6 Tasks 1/2/4 (env config, Dockerfile+Fly, CI) are also done. **Everything remaining is frontend** — Plan 3 entirely, Plan 4 Tasks 2–5, Plan 5 Task 4, and Plan 6 Tasks 3/5/6 (the last three blocked on Plan 3 since they need `packages/web` to exist). Each affected plan doc has its own `Status:` note near the top with specifics and any drift between the original doc text and what actually got built (mainly: the `Challenge` command is separate from `openListing`, not merged into it — see Plan 3's drift note before starting).
 
 **Spec:** `docs/superpowers/specs/2026-09-20-fc-draft-night-design.md`
 

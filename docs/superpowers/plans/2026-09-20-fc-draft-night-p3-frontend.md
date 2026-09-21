@@ -2,7 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
 >
-> **Prerequisite:** Plan 2 complete (server emits `state`, `joined`, `error`; accepts `join`, `start`, `openListing`, `bid`).
+> **Prerequisite:** Plan 2 complete (server emits `state`, `joined`, `error`, `catalogResults`, `seasonExport`; accepts `join`, `start`, `openListing`, `challenge`, `bid`, `searchCatalog`, `setPool`, `exportSeason`, `importSeason`).
+>
+> **Drift note (post-execution):** this doc was written before Plan 2 executed. Two things changed from what's assumed below — read this before Tasks 2, 6, 8:
+> 1. **`openListing` vs `challenge` are separate, not one action.** `openListing(playerId)` is *only* for claiming an unowned pool player or releasing your own — the server rejects it outright for a rival-owned player (`listing.ts` enforces this at the mutation boundary now, not just the engine layer). To go after a player owned by someone else, emit `challenge({ playerId, amount })` — the amount is required (must exceed the player's current listed value) since there's no "list at default price" for a rival's player. `Task 6`'s original design ("server decides pool-listing vs challenge from ownership") is wrong; the client must pick the action, and `challenge` needs a bid-amount input the way `openListing` doesn't.
+> 2. **There is no pool player in a freshly-created room.** The 5 clubs' full real FC26 rosters (134 players, all owned) are the only players present at room creation — a pool only exists once the host curates one via `searchCatalog`/`setPool` (built in Plan 2 Task 9, not originally in this doc's scope). `PoolList` (Task 6) needs to render BOTH the host-curated pool (unowned, click → `openListing`) and the five squads (owned, click → opens a bid-amount input, then `challenge`) — it's effectively a full player browser, not just a pool list.
 
 **Goal:** A phone-first React client: join a room, host setup, and the live Draft Board with parallel contests, per-contest countdowns, searchable pool, live budget bars, challenge-limit tracker, draft-log feed, list/bid/raise/release actions, and an instant alert when one of your players is challenged.
 
@@ -112,7 +116,10 @@ export interface Transport { emit(ev: string, p: any): void; on(ev: string, h: (
 export interface UiState {
   room: RoomState | null; managerId: string | null; error: string | null;
   join(p: { code: string; displayName: string; clubId: string; managerId?: string }): void;
-  start(): void; openListing(playerId: string): void; bid(contestId: string, amount: number): void;
+  start(): void;
+  openListing(playerId: string): void;          // pool claim or own-player release only
+  challenge(playerId: string, amount: number): void; // rival-owned player; amount required, must exceed listed value
+  bid(contestId: string, amount: number): void;
 }
 
 export function makeStore(t: Transport) {
@@ -121,6 +128,7 @@ export function makeStore(t: Transport) {
     join: (p) => t.emit("join", p),
     start: () => t.emit("start", { code: get().room?.code }),
     openListing: (playerId) => t.emit("openListing", { code: get().room?.code, playerId }),
+    challenge: (playerId, amount) => t.emit("challenge", { code: get().room?.code, playerId, amount }),
     bid: (contestId, amount) => t.emit("bid", { code: get().room?.code, contestId, amount }),
   }));
   t.on("state", (room: RoomState) => store.setState({ room }));
@@ -252,6 +260,8 @@ test("raise is disabled once the manager has used two quotes", () => {
 
 ## Task 6: PoolList (search + list/challenge actions)
 
+**Design (corrected — see the drift note at the top of this doc):** this is a full player browser, not just a pool list — a freshly-created room has no pool players at all, only the 5 clubs' owned squads, until the host curates a pool separately (`searchCatalog`/`setPool`, Plan 2 Task 9). So `PoolList` renders whatever's in `room.players` (owned + any curated pool) and picks the action per-player: an **unowned** player (`ownerId === null`) is a one-click claim (`onList(playerId)`, server locks it in at listed value via `openListing`); an **owned** (rival) player requires the user to enter a bid amount first, then calls `onChallenge(playerId, amount)` (server's `challenge` command, amount must exceed listed value). You never challenge your own player from here (that's the release flow, a separate action not covered by this task).
+
 **Files:** Create `src/components/PoolList.tsx`, `src/__tests__/poolList.test.tsx`
 
 - [ ] **Step 1: Failing test**
@@ -267,21 +277,31 @@ const players = {
 };
 
 test("search filters the list by name", async () => {
-  render(<PoolList players={players as any} onList={() => {}} />);
+  render(<PoolList players={players as any} myId="m_bay" onList={() => {}} onChallenge={() => {}} />);
   await userEvent.type(screen.getByPlaceholderText(/search/i), "haal");
   expect(screen.getByText(/Haaland/)).toBeTruthy();
   expect(screen.queryByText(/Mbappé/)).toBeNull();
 });
 
-test("clicking a pool player lists an offer at its listed value", async () => {
+test("clicking an unowned player claims it at listed value", async () => {
   const onList = vi.fn();
-  render(<PoolList players={players as any} onList={onList} />);
+  render(<PoolList players={players as any} myId="m_bay" onList={onList} onChallenge={() => {}} />);
   await userEvent.click(screen.getByRole("button", { name: /Haaland/ }));
   expect(onList).toHaveBeenCalledWith("haaland");
 });
+
+test("a rival-owned player opens a bid-amount input, then calls onChallenge", async () => {
+  const onChallenge = vi.fn();
+  render(<PoolList players={players as any} myId="m_bay" onList={() => {}} onChallenge={onChallenge} />);
+  await userEvent.click(screen.getByRole("button", { name: /Mbappé/ })); // owned by m_real, not me
+  const input = screen.getByLabelText(/bid amount/i);
+  await userEvent.type(input, "210");
+  await userEvent.click(screen.getByRole("button", { name: /challenge/i }));
+  expect(onChallenge).toHaveBeenCalledWith("mbappe", 210);
+});
 ```
 - [ ] **Step 2:** Run — FAIL. `pnpm -C packages/web test poolList`
-- [ ] **Step 3: Implement** `PoolList.tsx` — search box, filtered list showing name/position/value and owner (or "pool"); clicking calls `onList(playerId)` (server decides pool-listing vs challenge from ownership). Show a small "owned by X" tag; the challenge-limit guard is enforced server-side and surfaced via the `error` channel.
+- [ ] **Step 3: Implement** `PoolList.tsx` — search box, filtered list showing name/position/value and owner (or "pool"). An unowned player is a single-click button calling `onList(playerId)`. An owned player belonging to a rival (`ownerId !== myId && ownerId !== null`) is a button that reveals an inline bid-amount input + "Challenge" submit, calling `onChallenge(playerId, amount)` (validate `amount > listedValue` client-side as a UX nicety, but the server is the source of truth and will reject an invalid amount via the `error` channel regardless). A player owned by `myId` renders as non-actionable here (release is a separate flow). Show a small "owned by X" tag; the 3-per-rival challenge-limit guard is enforced server-side and surfaced via the `error` channel — no client-side tracking needed here (that's `ChallengeTracker`, Task 7).
 - [ ] **Step 4:** Run — PASS
 - [ ] **Step 5:** `git commit -am "feat(web): searchable PoolList with list/challenge action"`
 
@@ -353,7 +373,7 @@ function room() {
 }
 
 test("an alert appears when one of my players is under challenge", () => {
-  render(<DraftBoard room={room() as any} myId="m_real" now={0} actions={{ bid: () => {}, openListing: () => {} }} />);
+  render(<DraftBoard room={room() as any} myId="m_real" now={0} actions={{ bid: () => {}, openListing: () => {}, challenge: () => {} }} />);
   expect(screen.getByText(/your player .* challenged/i)).toBeTruthy();
   expect(screen.getByText(/Mbappé/)).toBeTruthy();
 });
@@ -420,4 +440,5 @@ test("selected players show a running count", () => {
 - **Draft log** → Task 7. ✅
 - **Live sync <~1s** → Task 2 store + Task 8 manual check. ✅
 - **Reconnection** → Task 2 persists `managerId`; Join passes it back. ✅
-- **Consistency:** `makeStore(transport)`, `RoomState`/`Contest`/`Manager` from `@fcdn/shared`, `onBid(contestId, amount)`, `onList(playerId)`, `now` prop for countdowns used identically across components.
+- **Consistency:** `makeStore(transport)`, `RoomState`/`Contest`/`Manager` from `@fcdn/shared`, `onBid(contestId, amount)`, `onList(playerId)`, `onChallenge(playerId, amount)`, `now` prop for countdowns used identically across components.
+- **Actual server socket contract (confirmed against the running Plan 2 implementation):** emits accepted: `join`, `start`, `openListing({code,playerId})`, `challenge({code,playerId,amount})`, `bid({code,contestId,amount})`, `searchCatalog({q?,position?,club?,limit?})`, `setPool({code,ids})`, `exportSeason({code})`, `importSeason({code,csv,base,step})`. Events received: `state` (full `RoomState`), `joined({managerId})`, `error(message: string)`, `catalogResults(SeedPlayer[])`, `seasonExport({csv,filename})`.

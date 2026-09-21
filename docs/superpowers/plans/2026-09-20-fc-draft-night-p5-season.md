@@ -3,6 +3,10 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
 >
 > **Prerequisite:** Plans 1–4 complete. Carryover *logic* (`startNextSeason`, `positionStepBudgets`, `releaseToOriginal`) already exists and is unit-tested in Plan 1 (`domain/season.ts`). This plan adds the file I/O and UI around it.
+>
+> **Status:** Tasks 1–3 (export, import, handoff wiring) are done and committed — `packages/server/src/export.ts`, `import.ts`, `RoomStore.applyHandoff`, and the gateway's `exportSeason`/`importSeason` handlers all exist and are tested. **Task 4 (UI) is not started** — that's what remains here. Two things changed from this doc's original text during execution, relevant to Task 4:
+> 1. **CSV escaping is real now.** `export.ts` exports `csvEscape(field): string` (RFC 4180 — quotes a field containing a comma/quote/newline, doubles internal quotes) and `import.ts` exports `parseCsvLine(line): string[]` (a real quoted-field-aware parser). This was added after a review caught that an unescaped manager `displayName` containing a comma (e.g. "O'Brien, Jr.") corrupted the export/import round-trip. The UI doesn't need to do anything with this directly — it's transparent, the CSV text is just a string the UI downloads/uploads as-is — but don't hand-roll any client-side CSV parsing/preview; if Task 4 wants a preview of the parsed finishing order, ask the server (there's no client-side CSV parser and there shouldn't be one).
+> 2. **`applyHandoff`/`startNextSeason` now validates the finishing order against the room's actual managers** and throws a clear error (surfaced via the existing `error` socket event) if a manager id is missing or doesn't match — so `SeasonImport`'s error-handling path (already planned below) will correctly catch and display this, no extra UI work needed for it beyond what's already specified.
 
 **Goal:** At draft close, export the full season (every listing, bid, win, release, final squads + spendable) with blank finishing-position fields. Host fills finishing order and re-uploads; the app applies position-stepped base budgets (20M steps), leftover carry, permanent price updates, renew/release, and reserved-overflow unwind to open season N+1.
 
@@ -158,22 +162,24 @@ import { loadSeed, type RoomState } from "@fcdn/shared";
 test("re-uploading a filled export opens season N+1 with position-stepped budgets", async () => {
   const q = new Queue<RoomState>();
   const store = new RoomStore(q, new Db(":memory:"), loadSeed(), () => "S1");
-  await store.create({ totalBudget: 600 });
+  await store.create({ totalBudget: 1500 }); // real FC26 dataset's budget floor — RoomStore.create enforces it
   await store.join("S1", { displayName: "Real", clubId: "real" });
-  await store.join("S1", { displayName: "Bayern", clubId: "bayern" });
+  await store.join("S1", { displayName: "Bayern", clubId: "bayern" }); // RoomStore.join mints id `m_${clubId}` -> "m_bayern", NOT "m_bay"
   // pretend the season closed; export, fill finishing order, re-import
   const closed = { ...store.get("S1")!, status: "closed" as const };
   q.setState("S1", closed);
   let { csv } = exportSeasonCsv(closed);
-  csv = csv.replace(/(m_real,[^\n]*),$/m, "$1,2").replace(/(m_bay,[^\n]*),$/m, "$1,1");
-  const next = await store.applyHandoff("S1", csv, { base: 600, step: 20 });
+  csv = csv.replace(/(m_real,[^\n]*),$/m, "$1,2").replace(/(m_bayern,[^\n]*),$/m, "$1,1");
+  const next = await store.applyHandoff("S1", csv, { base: 600, step: 20 }); // rebase `base`/`step` are independent test params, unrelated to the room's original floor-satisfying totalBudget
   expect(next.seasonNumber).toBe(2);
   // Bayern finished 1st (of two) => base 620; Real 2nd/last => base 600
   const bayBase = 620, realBase = 600;
-  expect(next.managers["m_bay"].spendable).toBe(bayBase + Math.max(0, closed.managers["m_bay"].spendable) - next.managers["m_bay"].reserved);
-  expect(next.managers["m_real"].spendable).toBe(realBase + Math.max(0, closed.managers["m_real"].spendable) - next.managers["m_real"].reserved);
+  expect(next.managers["m_bayern"]!.spendable).toBe(bayBase + Math.max(0, closed.managers["m_bayern"]!.spendable) - next.managers["m_bayern"]!.reserved);
+  expect(next.managers["m_real"]!.spendable).toBe(realBase + Math.max(0, closed.managers["m_real"]!.spendable) - next.managers["m_real"]!.reserved);
 });
 ```
+**Also note:** `startNextSeason` (in `@fcdn/shared`) validates that `finishingOrder` exactly matches the room's manager ids — a mismatched/typo'd id throws `"finishing order does not match room managers"` rather than silently misassigning a budget (a real bug found and fixed during Plan 2 execution). If this test's CSV-filling regex doesn't produce ids that exactly match both room managers, `applyHandoff` will throw here instead of returning a rebased state — keep the `m_real`/`m_bayern` replacements in sync with whatever ids `store.join` actually minted.
+
 - [ ] **Step 2:** Run — FAIL. `pnpm -C packages/server test handoff`
 - [ ] **Step 3: Implement** — add to `RoomStore`:
 ```ts

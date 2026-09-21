@@ -3,6 +3,8 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
 >
 > **Prerequisite:** Plans 1–5 complete. `pnpm -r test` green.
+>
+> **Status:** Tasks 1, 2, and 4 are done and committed (env-driven config + strict prod CORS in `server.ts`; `packages/server/Dockerfile` + root `fly.toml` + `.dockerignore`; `.github/workflows/ci.yml`, verified locally by actually running `pnpm install --frozen-lockfile && pnpm -r test && pnpm -r build`). **The Dockerfile was manually reviewed but not live-build-verified** — the Docker daemon wasn't reachable in the execution environment, so `docker build` was never actually run end-to-end; treat it as reviewed-but-unproven until someone runs a real build. Tasks 3, 5, 6 are untouched — all three need `packages/web` to exist (Plan 3), which hasn't been built yet.
 
 **Goal:** Ship the app to a public URL — server on Fly.io (persistent process + volume for SQLite), web on Vercel — wire the client to the production socket URL, add CI, polish phone-browser layout, and prove it with a multi-client Playwright smoke test against the built app.
 
@@ -192,8 +194,6 @@ test("five managers join, host starts, a bid propagates to all", async () => {
 - **Multi-client e2e proof** → Task 5. ✅
 - **Phone polish + reconnection** → Task 6. ✅
 - **Consistency:** `VITE_SOCKET_URL`, `WEB_ORIGIN`, `DB_PATH`, `PORT` env names match server code (Plan 2 Task 7) and client `connect()` (Plan 3 Task 2).
-```
-```
 
 ---
 
@@ -221,4 +221,3 @@ test("five managers join, host starts, a bid propagates to all", async () => {
 | Season export/import UI + wiring | P5 T1–4 |
 | Deploy, CI, e2e, phone polish | P6 T1–6 |
 | Deferred: spectator view, leaderboard, export checklist | out of scope (roadmap) |
-```

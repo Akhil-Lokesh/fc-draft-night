@@ -3,6 +3,8 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
 >
 > **Prerequisite:** Plans 1–3 complete. `RoomState.log` carries every `LogEntry`; the Draft Board is live.
+>
+> **Status:** Task 1 (analytics selectors) is done and committed — `packages/shared/src/domain/analytics.ts` exports `spendByManager`, `playerTrail`, `teamContests`, `mostContested`, `recapHighlights` exactly as specified below, re-exported from the package barrel. Tasks 2–5 (all React components — FormationPitch, ChallengeHistory, RecapCard, AnalyticsDashboard, and the Squad/Recap screens) are untouched; they depend on `packages/web` existing (Plan 3, not built yet).
 
 **Goal:** Ship the confirmed post-MVP features: a squad + formation pitch view, challenge history (per player and per team), an auto-generated recap card, and a full analytics dashboard — all derived from `RoomState` + `log`.
 
