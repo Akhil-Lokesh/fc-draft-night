@@ -21,3 +21,12 @@ test("valid budget starts the draft with chosen timers", async () => {
   await userEvent.click(screen.getByRole("button", { name: /start draft/i }));
   expect(start).toHaveBeenCalled();
 });
+
+test("a stray unit like 'M' or '€' in the budget is tolerated, not rejected", async () => {
+  const start = vi.fn();
+  render(<Setup floor={600} onStart={start} managerCount={5} />);
+  const input = screen.getByLabelText(/total budget/i);
+  await userEvent.clear(input); await userEvent.type(input, "600M");
+  await userEvent.click(screen.getByRole("button", { name: /start draft/i }));
+  expect(start).toHaveBeenCalledWith(expect.objectContaining({ totalBudget: 600 }));
+});

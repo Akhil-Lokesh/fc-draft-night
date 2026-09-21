@@ -31,8 +31,11 @@ export function Setup({
   const [cap, setCap] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // Tolerate a stray "€"/"M"/spaces a host may type next to the number — parse the digits only.
+  const parseAmount = (raw: string): number => Number(raw.replace(/[^\d.]/g, ""));
+
   const start = () => {
-    const total = Number(budget);
+    const total = parseAmount(budget);
     if (!Number.isFinite(total) || total < floor) {
       setError(`Budget is below the floor (€${floor}M). The priciest real squad must fit.`);
       return;
@@ -41,7 +44,7 @@ export function Setup({
     onStart({
       totalBudget: total,
       quoteTimerMs: timerMin * 60_000,
-      squadSizeCap: cap.trim() ? Number(cap) : null,
+      squadSizeCap: cap.trim() ? parseAmount(cap) : null,
     });
   };
 
@@ -72,11 +75,11 @@ export function Setup({
           <label className="label" htmlFor="setup-budget">Total budget per manager (€M)</label>
           <input
             id="setup-budget"
-            type="number"
+            type="text"
+            inputMode="decimal"
             className="input mono"
             style={{ fontSize: 20 }}
             value={budget}
-            min={floor}
             onChange={(e) => setBudget(e.target.value)}
           />
           <p className="muted mono" style={{ margin: "7px 0 0", fontSize: 12 }}>
@@ -116,23 +119,29 @@ export function Setup({
 
       {children}
 
-      <div className="panel rise" style={{ animationDelay: "0.1s", marginTop: 14 }}>
-        <div className="panel-head">
-          <span className="panel-title">Lobby</span>
-          <span className="mono muted" style={{ fontSize: 12 }}>{joined.length}/{managerCount}</span>
+      {joined.length > 0 && (
+        <div className="panel rise" style={{ animationDelay: "0.1s", marginTop: 14 }}>
+          <div className="panel-head">
+            <span className="panel-title">Managers</span>
+            <span className="mono muted" style={{ fontSize: 12 }}>{joined.length}/{managerCount}</span>
+          </div>
+          <div className="lobby">
+            {joined.map((m) => (
+              <div key={m.id} className={`lobby-row club-chip ${clubClass(m.clubId)}`}>
+                <span className="lobby-name">{m.displayName}</span>
+                <span className="muted" style={{ fontSize: 12 }}>{clubLabel(m.clubId)}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="lobby">
-          {joined.length === 0 && <div className="muted" style={{ fontSize: 13 }}>Waiting for managers to join…</div>}
-          {joined.map((m) => (
-            <div key={m.id} className={`lobby-row club-chip ${clubClass(m.clubId)}`}>
-              <span className="lobby-name">{m.displayName}</span>
-              <span className="muted" style={{ fontSize: 12 }}>{clubLabel(m.clubId)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
 
-      <button className="btn btn-primary btn-block" style={{ marginTop: 16 }} onClick={start}>
+      <p className="muted" style={{ fontSize: 13, textAlign: "center", margin: "16px 4px 0", lineHeight: 1.5 }}>
+        Next: you’ll get a shareable room code, then pick your name and club. Other
+        managers join from their phones with that code.
+      </p>
+
+      <button className="btn btn-primary btn-block" style={{ marginTop: 12 }} onClick={start}>
         {startLabel}
       </button>
     </div>
