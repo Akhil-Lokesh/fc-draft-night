@@ -8,8 +8,13 @@ import { Ticker } from "./timers.js";
 import { attachGateway } from "./gateway.js";
 import { loadSeed, type RoomState } from "@fcdn/shared";
 
+const origin = process.env.WEB_ORIGIN;
+if (process.env.NODE_ENV === "production" && !origin) {
+  throw new Error("WEB_ORIGIN required in production");
+}
+
 const http = createServer();
-const io = new Server(http, { cors: { origin: process.env.WEB_ORIGIN ?? "*" } });
+const io = new Server(http, { cors: { origin: origin ?? "*" } });
 const q = new Queue<RoomState>();
 const db = new Db(process.env.DB_PATH ?? "fcdn.sqlite");
 const store = new RoomStore(q, db, loadSeed());
