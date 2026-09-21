@@ -64,6 +64,24 @@ test("reserved outgrows new budget at handoff: resolves like a negative balance 
   void logLenBefore;
 });
 
+test("startNextSeason rejects a finishingOrder containing an unknown/typo'd manager id", () => {
+  let s = createRoom({ code: "AB", totalBudget: 600, seed: fixtureSeed() });
+  s = addManager(s, { id: "real", displayName: "R", clubId: "real" });
+  s = addManager(s, { id: "barca", displayName: "B", clubId: "barca" });
+  // "raal" is a typo of "real" — not a real manager id in this room.
+  expect(() => startNextSeason(s, { finishingOrder: ["raal", "barca"], base: 600, step: 20 }))
+    .toThrow(/finishing order does not match room managers/i);
+});
+
+test("startNextSeason rejects a finishingOrder missing a manager (fewer entries than actual managers)", () => {
+  let s = createRoom({ code: "AB", totalBudget: 600, seed: fixtureSeed() });
+  s = addManager(s, { id: "real", displayName: "R", clubId: "real" });
+  s = addManager(s, { id: "barca", displayName: "B", clubId: "barca" });
+  // Only "real" listed; "barca" is missing from the finishing order entirely.
+  expect(() => startNextSeason(s, { finishingOrder: ["real"], base: 600, step: 20 }))
+    .toThrow(/finishing order does not match room managers/i);
+});
+
 test("releasing a held player resets him to his original dataset value", () => {
   let s = createRoom({ code: "AB", totalBudget: 600, seed: fixtureSeed() });
   s = addManager(s, { id: "real", displayName: "R", clubId: "real" });

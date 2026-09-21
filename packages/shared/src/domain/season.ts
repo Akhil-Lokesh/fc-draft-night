@@ -25,6 +25,10 @@ export function releaseToOriginal(s: RoomState, ownerId: string, playerId: strin
 export function startNextSeason(
   s: RoomState, a: { finishingOrder: string[]; base: number; step: number },
 ): RoomState {
+  const managerIds = new Set(Object.keys(s.managers));
+  const orderIds = new Set(a.finishingOrder);
+  const setsMatch = managerIds.size === orderIds.size && [...managerIds].every(id => orderIds.has(id));
+  if (!setsMatch) throw new Error("finishing order does not match room managers");
   const bases = positionStepBudgets(a.finishingOrder, a.base, a.step);
   const managers = { ...s.managers };
   const players = Object.fromEntries(Object.entries(s.players).map(([id, p]) => [id, { ...p, lockedThisSeason: false }]));
