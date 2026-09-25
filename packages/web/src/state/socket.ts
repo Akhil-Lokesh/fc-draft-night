@@ -14,12 +14,14 @@ export interface CreateOpts {
   quoteTimerMs?: number;
   squadSizeCap?: number | null;
   capacity?: number;
+  rosterCsv?: string;
 }
 
 export interface RoomPeek {
   capacity: number;
   takenClubs: string[];
   managerCount: number;
+  allClubs: { id: string; label: string }[];
 }
 
 export interface JoinPayload {
@@ -27,12 +29,19 @@ export interface JoinPayload {
   displayName: string;
   clubId: string;
   managerId?: string;
+  /** Secret the server issued for this seat on first join — the only thing that can reattach it. */
+  seatKey?: string;
+  /** Secret handed to whoever created the room; joining with it makes you host. */
+  hostKey?: string;
 }
 
 export interface CatalogPlayer {
   id: string;
   name: string;
   position: string;
+  positionDetail?: string;
+  altPositions?: string[];
+  tags?: string[];
   value: number;
   club: string;
   clubId: string | null;
@@ -56,16 +65,32 @@ export interface UiState {
   /** Go after a rival-owned player; amount is required and must exceed the player's listed value. */
   challenge(playerId: string, amount: number): void;
   bid(contestId: string, amount: number): void;
+  /** Give up on a war you're involved in. Owner giving up ends it now; anyone else just drops out. */
+  forfeit(contestId: string): void;
+  /** Host-only: force-resolve every open contest right now and close the room. */
+  endDraft(): void;
   search(q: { q?: string; position?: string; club?: string; limit?: number }): void;
   setPool(ids: string[]): void;
   exportSeason(): void;
   importSeason(csv: string, base: number, step: number): void;
   clearError(): void;
+  /** Guest in the lobby: ask the host's permission to leave. */
+  requestLeave(): void;
+  /** Take back a leave request the host hasn't answered yet. */
+  cancelLeave(): void;
+  /** Host: let a guest go (removes them, freeing their club) or keep them in. */
+  resolveLeave(managerId: string, allow: boolean): void;
+  /** Leave the current room (e.g. "back to home" after a draft closes) — clears local room
+   *  state and forgets the saved join, so a later reconnect doesn't silently rejoin it. */
+  leave(): void;
 }
 
 const JOIN_KEY = "fcdn.join";
 function persistJoin(p: JoinPayload) { try { localStorage.setItem(JOIN_KEY, JSON.stringify(p)); } catch { /* no storage */ } }
 function loadJoin(): JoinPayload | null { try { const s = localStorage.getItem(JOIN_KEY); return s ? JSON.parse(s) : null; } catch { return null; } }
+const HOST_KEY = "fcdn.hostKey";
+function loadHostKey(): { code: string; key: string } | null { try { const s = localStorage.getItem(HOST_KEY); return s ? JSON.parse(s) : null; } catch { return null; } }
+function saveHostKey(v: { code: string; key: string } | null) { try { if (v) localStorage.setItem(HOST_KEY, JSON.stringify(v)); else localStorage.removeItem(HOST_KEY); } catch { /* no storage */ } }
 export function clearJoin() { try { localStorage.removeItem(JOIN_KEY); } catch { /* no storage */ } }
 
 export function makeStore(t: Transport) {
@@ -73,6 +98,13 @@ export function makeStore(t: Transport) {
   // silently rejoin the socket.io room — otherwise the new socket id isn't in the room and the
   // client stops receiving broadcasts (e.g. never sees the draft go live).
   let lastJoin: JoinPayload | null = loadJoin();
+  // The room we just walked away from. The server may keep broadcasting it to this socket for a
+  // moment; those stray states must not pull the client back in (that silently blocked the
+  // "created -> join" redirect for a host who left a finished draft and created a new room).
+  let leftCode: string | null = null;
+  // The host key for the room this tab just created — attached to that room's first join only.
+  // Kept in storage too: a refresh between "create" and "join" must not leave the room hostless.
+  let hostKey: { code: string; key: string } | null = loadHostKey();
 
   const store = createStore<UiState>((set, get) => {
     const code = () => get().room?.code ?? get().createdCode ?? undefined;
@@ -85,18 +117,37 @@ export function makeStore(t: Transport) {
       seasonExport: null,
       roomPeek: null,
 
-      create: (opts) => t.emit("create", opts),
-      join: (p) => { lastJoin = p; persistJoin(p); t.emit("join", p); },
+      create: (opts) => { leftCode = null; t.emit("create", opts); },
+      join: (p) => {
+        leftCode = null;
+        // Re-entering the same room from the form (e.g. a fresh tab): bring this device's seat key.
+        const prior = lastJoin?.code === p.code ? lastJoin : loadJoin()?.code === p.code ? loadJoin() : null;
+        let payload = prior?.seatKey && !p.seatKey ? { ...p, seatKey: prior.seatKey } : p;
+        if (hostKey?.code === p.code) payload = { ...payload, hostKey: hostKey.key };
+        lastJoin = payload; persistJoin(payload); t.emit("join", payload);
+      },
       peekRoom: (code) => t.emit("peekRoom", { code }),
       start: () => t.emit("start", { code: code() }),
       openListing: (playerId) => t.emit("openListing", { code: code(), playerId }),
       challenge: (playerId, amount) => t.emit("challenge", { code: code(), playerId, amount }),
       bid: (contestId, amount) => t.emit("bid", { code: code(), contestId, amount }),
+      forfeit: (contestId) => t.emit("forfeit", { code: code(), contestId }),
+      endDraft: () => t.emit("endDraft", { code: code() }),
       search: (q) => t.emit("searchCatalog", q),
       setPool: (ids) => t.emit("setPool", { code: code(), ids }),
       exportSeason: () => t.emit("exportSeason", { code: code() }),
       importSeason: (csv, base, step) => t.emit("importSeason", { code: code(), csv, base, step }),
       clearError: () => set({ error: null }),
+      requestLeave: () => t.emit("requestLeave", { code: code() }),
+      cancelLeave: () => t.emit("cancelLeave", { code: code() }),
+      resolveLeave: (managerId, allow) => t.emit("resolveLeave", { code: code(), managerId, allow }),
+      leave: () => {
+        const was = get().room?.code ?? lastJoin?.code ?? null;
+        if (was) { leftCode = was; t.emit("leave", { code: was }); }
+        lastJoin = null;
+        clearJoin();
+        set({ room: null, managerId: null, createdCode: null, roomPeek: null });
+      },
     };
   });
 
@@ -107,10 +158,20 @@ export function makeStore(t: Transport) {
     const managerId = lastJoin.managerId ?? savedManagerId() ?? undefined;
     t.emit("join", managerId ? { ...lastJoin, managerId } : lastJoin);
   });
-  t.on("state", (room: RoomState) => store.setState({ room }));
-  t.on("created", ({ code }: { code: string }) => store.setState({ createdCode: code }));
-  t.on("joined", ({ managerId }: { managerId: string }) => {
+  t.on("state", (room: RoomState) => {
+    if (leftCode && room.code === leftCode) return;
+    store.setState({ room });
+  });
+  t.on("created", ({ code, hostKey: key }: { code: string; hostKey?: string }) => {
+    if (key) { hostKey = { code, key }; saveHostKey(hostKey); }
+    store.setState({ createdCode: code });
+  });
+  t.on("joined", ({ managerId, seatKey }: { managerId: string; seatKey?: string }) => {
     store.setState({ managerId });
+    if (lastJoin && seatKey) lastJoin = { ...lastJoin, seatKey };
+    // Host key is single-use; the seat key carries identity from here on.
+    if (lastJoin?.hostKey) { const { hostKey: _used, ...rest } = lastJoin; lastJoin = rest; }
+    if (hostKey && lastJoin?.code === hostKey.code) { hostKey = null; saveHostKey(null); }
     // Remember the assigned managerId in-memory (and in storage) so a later reconnect rejoins
     // as the SAME manager, not as a new one. In-memory is the source of truth — storage may be
     // absent (SSR, private mode, jsdom).

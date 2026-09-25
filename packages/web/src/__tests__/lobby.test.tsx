@@ -1,11 +1,11 @@
-import { test, expect } from "vitest";
+import { test, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Lobby } from "../screens/Lobby.js";
 
 const room: any = {
   code: "R0002", totalBudget: 1500, quoteTimerMs: 180_000, draftClockMs: 3_600_000, squadSizeCap: null,
-  capacity: 5, seasonNumber: 1, status: "setup", startedAt: null,
+  capacity: 5, clubNames: {}, clubBudgets: {}, seasonNumber: 1, status: "setup", startedAt: null,
   managers: {
     m_arsenal: { id: "m_arsenal", displayName: "loki", clubId: "arsenal", reserved: 1145, spendable: 355 },
   },
@@ -22,4 +22,42 @@ test("tapping a manager reveals their existing squad; pool players are excluded"
   await userEvent.click(screen.getByRole("button", { name: /loki/i }));
   expect(screen.getByText(/B\. Saka/)).toBeTruthy();
   expect(screen.queryByText(/Free Agent/)).toBeNull(); // unowned → not in any squad
+});
+
+test("the host's Leave control walks straight out, no approval needed", async () => {
+  const onLeave = vi.fn();
+  render(<Lobby room={room} myId="m_arsenal" iAmHost onStart={() => {}} onLeave={onLeave} />);
+  await userEvent.click(screen.getByRole("button", { name: /leave room/i }));
+  expect(onLeave).toHaveBeenCalledTimes(1);
+});
+
+test("a guest's Leave asks the host instead of walking out, and can be taken back", async () => {
+  const onLeave = vi.fn(), onRequestLeave = vi.fn(), onCancelLeave = vi.fn();
+  const { rerender } = render(
+    <Lobby room={room} myId="m_arsenal" iAmHost={false} onStart={() => {}} onLeave={onLeave} onRequestLeave={onRequestLeave} onCancelLeave={onCancelLeave} />,
+  );
+  await userEvent.click(screen.getByRole("button", { name: /leave room/i }));
+  expect(onRequestLeave).toHaveBeenCalledTimes(1);
+  expect(onLeave).not.toHaveBeenCalled();
+  rerender(
+    <Lobby room={{ ...room, leaveRequests: ["m_arsenal"] }} myId="m_arsenal" iAmHost={false} onStart={() => {}} onLeave={onLeave} onRequestLeave={onRequestLeave} onCancelLeave={onCancelLeave} />,
+  );
+  expect(screen.getByText(/waiting for the host to let you leave/i)).toBeTruthy();
+  await userEvent.click(screen.getByRole("button", { name: /^stay$/i }));
+  expect(onCancelLeave).toHaveBeenCalledTimes(1);
+});
+
+test("the host sees each leave request and can let the guest go or keep them", async () => {
+  const onResolveLeave = vi.fn();
+  render(<Lobby room={{ ...room, leaveRequests: ["m_arsenal"] }} myId="m_host" iAmHost onStart={() => {}} onResolveLeave={onResolveLeave} />);
+  expect(screen.getByText(/wants to leave/i)).toBeTruthy();
+  await userEvent.click(screen.getByRole("button", { name: /let go/i }));
+  expect(onResolveLeave).toHaveBeenCalledWith("m_arsenal", true);
+});
+
+test("the guest is told when the host keeps them in", () => {
+  const props = { myId: "m_arsenal", iAmHost: false, onStart: () => {}, onRequestLeave: () => {} };
+  const { rerender } = render(<Lobby room={{ ...room, leaveRequests: ["m_arsenal"] }} {...props} />);
+  rerender(<Lobby room={{ ...room, leaveRequests: [] }} {...props} />);
+  expect(screen.getByText(/host asked you to stay/i)).toBeTruthy();
 });

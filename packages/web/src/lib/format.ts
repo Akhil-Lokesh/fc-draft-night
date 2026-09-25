@@ -1,3 +1,10 @@
+/** The exact FC position(s) a player can play (e.g. "CAM · CM"), falling back to the coarse
+ *  GK/DEF/MID/FWD bucket for a synthetic player the database never heard of. */
+export function positionLabel(p: { position: string; positionDetail?: string; altPositions?: string[] }): string {
+  if (!p.positionDetail) return p.position;
+  return p.altPositions?.length ? `${p.positionDetail} · ${p.altPositions.join("/")}` : p.positionDetail;
+}
+
 /** Money in millions: whole numbers bare, otherwise one decimal. The "€" glyph is a CSS ::before. */
 export function money(n: number): string {
   const r = Math.round(n * 10) / 10;

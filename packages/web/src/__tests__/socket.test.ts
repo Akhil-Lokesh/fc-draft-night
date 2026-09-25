@@ -37,6 +37,43 @@ test("challenge() emits playerId + amount for a rival-owned player", () => {
   expect(t.emitted.at(-1)).toMatchObject({ ev: "challenge", p: { code: "AB", playerId: "mbappe", amount: 210 } });
 });
 
+test("forfeit() emits a forfeit intent carrying the room code and contestId", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  t.fire("state", { code: "AB", managers: {}, players: {}, contests: {} });
+  store.getState().forfeit("c1");
+  expect(t.emitted.at(-1)).toMatchObject({ ev: "forfeit", p: { code: "AB", contestId: "c1" } });
+});
+
+test("endDraft() emits an endDraft intent carrying the room code", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  t.fire("state", { code: "AB", managers: {}, players: {}, contests: {} });
+  store.getState().endDraft();
+  expect(t.emitted.at(-1)).toMatchObject({ ev: "endDraft", p: { code: "AB" } });
+});
+
+test("leave() clears the joined room so the app can return to the landing screen", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  t.fire("joined", { managerId: "m_city" });
+  t.fire("state", { code: "AB", managers: {}, players: {}, contests: {} });
+  store.getState().leave();
+  expect(store.getState().room).toBeNull();
+  expect(store.getState().managerId).toBeNull();
+});
+
+test("leave() stops a later reconnect from silently rejoining the old room", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  t.fire("joined", { managerId: "m_city" });
+  t.fire("state", { code: "AB", managers: {}, players: {}, contests: {} });
+  store.getState().leave();
+  t.emitted.length = 0; // clear the log, only care about what happens after reconnect
+  t.fire("connect", undefined);
+  expect(t.emitted.find(e => e.ev === "join")).toBeUndefined();
+});
+
 test("create() emits create and captures the code the server returns", () => {
   const t = fakeTransport();
   const store = makeStore(t as any);
@@ -69,6 +106,70 @@ test("peekRoom emits a peek and stores the server's roomPeek reply", () => {
   const store = makeStore(t as any);
   store.getState().peekRoom("AB");
   expect(t.emitted.at(-1)).toMatchObject({ ev: "peekRoom", p: { code: "AB" } });
-  t.fire("roomPeek", { capacity: 3, takenClubs: ["real"], managerCount: 1 });
-  expect(store.getState().roomPeek).toEqual({ capacity: 3, takenClubs: ["real"], managerCount: 1 });
+  const peek = { capacity: 3, takenClubs: ["real"], managerCount: 1, allClubs: [{ id: "real", label: "Real Madrid" }] };
+  t.fire("roomPeek", peek);
+  expect(store.getState().roomPeek).toEqual(peek);
+});
+
+test("after leave(), stray state broadcasts from the old room are ignored and the server is told", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  store.getState().join({ code: "R0001", displayName: "Ana", clubId: "real" });
+  t.fire("joined", { managerId: "m_real" });
+  t.fire("state", { code: "R0001", managers: {}, players: {}, contests: {} });
+
+  store.getState().leave();
+  expect(t.emitted.at(-1)).toMatchObject({ ev: "leave", p: { code: "R0001" } });
+
+  // The old room keeps broadcasting to this socket for a moment — it must not come back.
+  t.fire("state", { code: "R0001", managers: {}, players: {}, contests: {} });
+  expect(store.getState().room).toBeNull();
+
+  // Creating a new room still works: its code arrives and its state is accepted once joined.
+  t.fire("created", { code: "R0002" });
+  expect(store.getState().createdCode).toBe("R0002");
+  store.getState().join({ code: "R0002", displayName: "Ana", clubId: "real" });
+  t.fire("state", { code: "R0002", managers: {}, players: {}, contests: {} });
+  expect(store.getState().room?.code).toBe("R0002");
+});
+
+test("rejoining the room you left accepts its state again", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  store.getState().join({ code: "R0001", displayName: "Ana", clubId: "real" });
+  t.fire("state", { code: "R0001", managers: {}, players: {}, contests: {} });
+  store.getState().leave();
+  store.getState().join({ code: "R0001", displayName: "Ana", clubId: "real" });
+  t.fire("state", { code: "R0001", managers: {}, players: {}, contests: {} });
+  expect(store.getState().room?.code).toBe("R0001");
+});
+
+test("the seat key from the server is kept and sent on reconnect, so a refresh reclaims the same seat", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  store.getState().join({ code: "AB", displayName: "A", clubId: "city" });
+  t.fire("joined", { managerId: "m_city", seatKey: "secret-key" });
+  t.fire("connect", undefined);
+  expect(t.emitted.at(-1)).toMatchObject({ ev: "join", p: { code: "AB", seatKey: "secret-key" } });
+});
+
+test("leaving a room forgets its seat key", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  store.getState().join({ code: "AB", displayName: "A", clubId: "city" });
+  t.fire("joined", { managerId: "m_city", seatKey: "secret-key" });
+  store.getState().leave();
+  const before = t.emitted.length;
+  t.fire("connect", undefined);
+  expect(t.emitted.slice(before).some((e) => JSON.stringify(e.p ?? "").includes("secret-key"))).toBe(false);
+});
+
+test("the host key from create rides along on that room's join, and only that one", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  t.fire("created", { code: "AB", hostKey: "host-secret" });
+  store.getState().join({ code: "AB", displayName: "A", clubId: "city" });
+  expect(t.emitted.at(-1)).toMatchObject({ ev: "join", p: { code: "AB", hostKey: "host-secret" } });
+  store.getState().join({ code: "ZZ", displayName: "A", clubId: "city" });
+  expect(t.emitted.at(-1)!.p.hostKey).toBeUndefined();
 });
