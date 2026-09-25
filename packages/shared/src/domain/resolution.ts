@@ -34,7 +34,13 @@ function applyWin(s: RoomState, c: Contest, winnerId: string, price: number, now
   if (!winnerAfterSale) throw new Error(`unknown manager ${winnerId}`);
   managers[winnerId] = { ...winnerAfterSale, reserved: winnerAfterSale.reserved + (prevOwner === winnerId ? (newValue - player.listedValue) : newValue) };
   players[c.playerId] = { ...player, ownerId: winnerId, listedValue: newValue, lockedThisSeason: true };
-  log.push({ t: "win", at: now, contestId: c.id, managerId: winnerId, playerId: c.playerId, price });
+  // A release-listing nobody ever quoted on but the lister's own opening one (quotes.length===1)
+  // reverts to them with zero net cost (cost() above is 0) — log it as "unsold", not "win", so it
+  // doesn't read as a fresh purchase in the feed or inflate spend/recap totals. A release that
+  // DID draw a rival bid and the original owner won back by outbidding them (quotes.length > 1)
+  // is a real, paid-for defense — still a genuine "win".
+  const unsold = c.type === "release-listing" && c.quotes.length === 1;
+  log.push({ t: unsold ? "unsold" : "win", at: now, contestId: c.id, managerId: winnerId, playerId: c.playerId, price });
   return { ...s, managers, players, contests: { ...s.contests, [c.id]: { ...c, status: "closed" } }, log };
 }
 
@@ -71,11 +77,30 @@ export function finalizeContest(s: RoomState, contestId: string, now: number): R
   return voided;
 }
 
-/** Resolve every due contest in close order, then repair deficits exactly once for the whole batch. */
+/** Resolve every due contest in close order, then repair deficits exactly once for the whole batch.
+ *  Once the overall draft clock has elapsed AND nothing is left open (an active war still runs out
+ *  its own anti-snipe timer first), the room closes on its own — the host button is only for
+ *  ending things early. */
 export function resolveDue(s: RoomState, now: number): RoomState {
   let state = s;
   for (const c of dueContests(state, now)) state = finalizeContest(state, c.id, now);
-  return repairAll(state, now);
+  state = repairAll(state, now);
+  const clockElapsed = state.status === "live" && state.startedAt !== null && now >= state.startedAt + state.draftClockMs;
+  const nothingOpen = Object.values(state.contests).every(c => c.status !== "war" && c.status !== "listing");
+  if (clockElapsed && nothingOpen) state = { ...state, status: "closed" };
+  return state;
+}
+
+/** The host manually ending the draft: force-resolve every open contest right now regardless of
+ *  its own closesAt (unlike the natural clock, which lets an active war run out its own timer),
+ *  then close the room. */
+export function endDraftNow(s: RoomState, now: number): RoomState {
+  let state = s;
+  for (const c of Object.values(state.contests).filter(c => c.status === "war" || c.status === "listing")) {
+    state = finalizeContest(state, c.id, now);
+  }
+  state = repairAll(state, now);
+  return { ...state, status: "closed" };
 }
 
 /** Release the manager's own players (cheapest listed value first) until spendable >= 0.

@@ -22,3 +22,22 @@ test("createRoom defaults capacity to 5 and honors an explicit capacity", () => 
   const s2 = createRoom({ code: "ABCD", totalBudget: 600, seed: fixtureSeed(), capacity: 3 });
   expect(s2.capacity).toBe(3);
 });
+
+test("a manager's starting budget uses their club's override when the room has one, else the flat totalBudget", () => {
+  const s = createRoom({
+    code: "ABCD", totalBudget: 600, seed: fixtureSeed(),
+    clubBudgets: { real: 900 },
+  });
+  const withOverride = addManager(s, { id: "m_real", displayName: "Ana", clubId: "real" });
+  const real = withOverride.managers["m_real"]!;
+  expect(real.spendable).toBe(900 - real.reserved);
+
+  const withoutOverride = addManager(s, { id: "m_barca", displayName: "Bo", clubId: "barca" });
+  const barca = withoutOverride.managers["m_barca"]!;
+  expect(barca.spendable).toBe(600 - barca.reserved);
+});
+
+test("createRoom honors an explicit seasonNumber, defaulting to 1", () => {
+  expect(createRoom({ code: "AB", totalBudget: 600, seed: fixtureSeed() }).seasonNumber).toBe(1);
+  expect(createRoom({ code: "AB", totalBudget: 600, seed: fixtureSeed(), seasonNumber: 2 }).seasonNumber).toBe(2);
+});

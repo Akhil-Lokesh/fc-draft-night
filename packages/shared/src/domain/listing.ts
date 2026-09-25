@@ -1,24 +1,32 @@
 import type { RoomState, Contest } from "./types.js";
-import { LISTING_MS } from "./types.js";
+import { LISTING_MS, hasOpenContest } from "./types.js";
 
 /**
- * Open a listing on a player you either don't own (pool claim) or do own (release).
+ * Claim a pool player, or release one of your own. A pool claim opens a 2-minute public listing
+ * any manager can jump in on. Releasing your OWN player is instant instead — no listing window,
+ * no chance for a rival to snipe it — he goes straight back to the pool at his current listed
+ * value and you get the reserved amount back immediately (see `releaseOwnPlayer`).
  * NOT for challenging a rival's owned player — that's openChallenge (next task).
  */
 export function openListing(
   s: RoomState, a: { managerId: string; playerId: string; now: number },
-): { state: RoomState; contestId: string } {
+): { state: RoomState; contestId: string | null } {
   const player = s.players[a.playerId];
   if (!player) throw new Error(`unknown player ${a.playerId}`);
   if (player.ownerId && player.ownerId !== a.managerId) {
     throw new Error("cannot list a player owned by another manager — use openChallenge instead");
   }
-  const isOwner = player.ownerId === a.managerId;
-  const type = isOwner ? "release-listing" : "pool-listing";
+  // Without this, a second listing (or a challenge landing mid-flight) on a player who's
+  // already got an open contest would create two independent contests racing to resolve the
+  // same player's ownership — e.g. two rapid release-taps before the first one's broadcast back.
+  if (hasOpenContest(s, a.playerId)) throw new Error("player already has an open contest");
+
+  if (player.ownerId === a.managerId) return { state: releaseOwnPlayer(s, a), contestId: null };
+
   const price = player.listedValue;
   const id = `c${s.seq + 1}`;
   const contest: Contest = {
-    id, playerId: a.playerId, type, status: "listing",
+    id, playerId: a.playerId, type: "pool-listing", status: "listing",
     listerId: a.managerId,
     quotes: [{ managerId: a.managerId, amount: price, at: a.now }],
     // The listing's own seed quote does NOT count toward quoteCounts / the 2-quote cap —
@@ -30,9 +38,27 @@ export function openListing(
     state: {
       ...s, seq: s.seq + 1,
       contests: { ...s.contests, [id]: contest },
-      log: [...s.log, { t: "listing", at: a.now, managerId: a.managerId, playerId: a.playerId, price, kind: type }],
+      log: [...s.log, { t: "listing", at: a.now, managerId: a.managerId, playerId: a.playerId, price, kind: "pool-listing" }],
     },
     contestId: id,
+  };
+}
+
+/** Instant release: the player goes straight back to the pool at his current listed value, and
+ *  the manager reclaims that value from reserved into spendable right away — no public listing,
+ *  no window for a rival to grab him first. */
+function releaseOwnPlayer(s: RoomState, a: { managerId: string; playerId: string; now: number }): RoomState {
+  const player = s.players[a.playerId]!;
+  const manager = s.managers[a.managerId];
+  if (!manager) throw new Error(`unknown manager ${a.managerId}`);
+  return {
+    ...s,
+    managers: {
+      ...s.managers,
+      [a.managerId]: { ...manager, reserved: manager.reserved - player.listedValue, spendable: manager.spendable + player.listedValue },
+    },
+    players: { ...s.players, [a.playerId]: { ...player, ownerId: null } },
+    log: [...s.log, { t: "release", at: a.now, managerId: a.managerId, playerId: a.playerId, toValue: player.listedValue }],
   };
 }
 

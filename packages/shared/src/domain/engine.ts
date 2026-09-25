@@ -1,7 +1,7 @@
 import type { RoomState, LogEntry } from "./types.js";
 import { openListing } from "./listing.js";
-import { placeBid, openChallenge } from "./war.js";
-import { resolveDue } from "./resolution.js";
+import { placeBid, openChallenge, forfeit } from "./war.js";
+import { resolveDue, endDraftNow } from "./resolution.js";
 import { canChallenge, recordChallenge } from "./challenge.js";
 
 export type Command =
@@ -9,6 +9,8 @@ export type Command =
   | { type: "OpenListing"; managerId: string; playerId: string; now: number }
   | { type: "Challenge"; managerId: string; playerId: string; amount: number; now: number }
   | { type: "PlaceBid"; contestId: string; managerId: string; amount: number; now: number }
+  | { type: "Forfeit"; contestId: string; managerId: string; now: number }
+  | { type: "EndDraft"; now: number }
   | { type: "Tick"; now: number };
 
 export function applyCommand(s: RoomState, cmd: Command): { state: RoomState; events: LogEntry[] } {
@@ -41,6 +43,12 @@ export function applyCommand(s: RoomState, cmd: Command): { state: RoomState; ev
     }
     case "PlaceBid":
       state = placeBid(s, cmd);
+      break;
+    case "Forfeit":
+      state = forfeit(s, cmd);
+      break;
+    case "EndDraft":
+      state = endDraftNow(s, cmd.now);
       break;
     case "Tick":
       state = resolveDue(s, cmd.now);

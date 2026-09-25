@@ -5,7 +5,7 @@ import type { RoomState, Contest } from "../domain/types.js";
 function stateWith(contests: Contest[], draftClockMs = 3_600_000): RoomState {
   return {
     code: "AB", totalBudget: 600, quoteTimerMs: 300_000, draftClockMs,
-    squadSizeCap: null, capacity: 5, seasonNumber: 1, status: "live", startedAt: 0,
+    squadSizeCap: null, capacity: 5, clubNames: {}, clubBudgets: {}, seasonNumber: 1, status: "live", startedAt: 0,
     managers: {}, players: {},
     contests: Object.fromEntries(contests.map(c => [c.id, c])),
     challenges: {}, log: [], seq: contests.length,
@@ -19,7 +19,14 @@ test("contests whose anti-snipe timer has elapsed are due, in close order", () =
   expect(dueContests(s, 600).map(x => x.id)).toEqual(["b", "a"]); // sorted by closesAt asc
 });
 
-test("when the 1-hour draft clock passes, every open contest is due at once", () => {
-  const s = stateWith([c("a", 999_999), c("b", 999_999)], 3_600_000);
-  expect(dueContests(s, 3_600_001).map(x => x.id).sort()).toEqual(["a", "b"]);
+/**
+ * A live war's own anti-snipe timer must win even past the draft's nominal 1-hour mark — a bid
+ * placed right before the deadline still gets its full 5-minute window, so nobody can snipe a
+ * contest just by timing a bid for the last second of the draft. The overall draft clock is a
+ * target end time, not a hard cutoff that cuts an active war short.
+ */
+test("a contest whose own timer hasn't elapsed yet is NOT force-closed just because the draft clock has passed", () => {
+  const s = stateWith([c("a", 3_700_000)], 3_600_000); // closesAt is past the 1hr draft clock (a late reset)
+  expect(dueContests(s, 3_600_001)).toEqual([]); // draft clock alone doesn't close it
+  expect(dueContests(s, 3_700_001).map(x => x.id)).toEqual(["a"]); // its own timer eventually does
 });
