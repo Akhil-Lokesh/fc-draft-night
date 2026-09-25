@@ -1,0 +1,42 @@
+# FC Draft Night — roster upload template
+# Fill this in, save as .csv, upload it in Host Setup. Every player is cross-checked
+# against the FC26 database — use exact-ish names/clubs as they appear in the game
+# (accents/case don't matter, e.g. "Atletico Madrid" matches "Atlético Madrid").
+#
+# Not sure a name will match, or two players share one? Add a 4th column with the exact
+# FC26 catalog id instead (after "number", which you can then leave blank) — it's matched
+# exactly, skipping name-matching entirely. Get an id from the host's in-app pool search
+# (Setup → Build the pool), which shows it per result.
+tournament,Friday Night League
+season,1
+budgetStep,0
+
+## TEAMS
+# One row per team. Leave finishingPosition BLANK for season 1 — nobody has a rank yet.
+# From season 2 onward, every team needs a unique finishingPosition (1 = champion).
+club,finishingPosition
+Chelsea,
+Atletico Madrid,
+Arsenal,
+
+## SQUADS
+# One row per player. Each player belongs to exactly one of the teams listed above.
+# The "number" column is optional (shirt/squad number) — leave it blank if you don't know it.
+# Numbers can repeat, within a team or across teams. Optional 4th "id" column pins an exact
+# catalog match instead of matching by name — see the note up top.
+club,player,number
+Chelsea,C. Palmer,20
+Chelsea,M. Caicedo,25
+Chelsea,E. Fernandez,8
+Atletico Madrid,J. Alvarez,19
+Atletico Madrid,Pablo Barrios,24
+Arsenal,B. Saka,7
+Arsenal,M. Odegaard,8
+
+## POOL
+# Optional. Extra players (any club, including teams not listed above) that go into the
+# free-agent pool from the start, up for grabs by any manager. Leave this section out
+# entirely if you don't want any. Numbers are optional here too.
+club,player,number
+Liverpool,F. Wirtz,7
+Liverpool,A. Isak,9
