@@ -2,3 +2,13 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Runtime game database (rooms, managers, seat-key hashes) — local state, never committed
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Raw source datasets (10 MB+). Re-downloadable — see packages/server/src/data/fc26-data.sources.md
+/FC26_*.csv
+/archive/
