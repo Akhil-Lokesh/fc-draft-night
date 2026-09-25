@@ -16,4 +16,7 @@ export class Catalog {
     const set = new Set(ids);
     return this.all.filter(p => set.has(p.id) && p.clubId === null); // pool-eligible only, same guarantee as search
   }
+
+  /** The full FC26 database (all real clubs), for cross-checking an uploaded roster. */
+  raw(): SeedPlayer[] { return this.all; }
 }

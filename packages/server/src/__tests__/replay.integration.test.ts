@@ -27,8 +27,9 @@ test("multi-client replay: sync, ticker-driven overcommit cascade, and crash rec
   const a = client(url); // city manager — will become the overcommitting bidder
   const b = client(url); // bayern manager — a rival whose player city will challenge
 
+  // a joins first so a is host (first manager in a room built without a host key) and can start.
+  await new Promise<any>(res => a.once("joined", res).emit("join", { code: "TEST1", displayName: "A", clubId: "city" }));
   const bothJoined = new Promise<any>(res => b.on("state", res));
-  a.emit("join", { code: "TEST1", displayName: "A", clubId: "city" });
   b.emit("join", { code: "TEST1", displayName: "B", clubId: "bayern" });
   const afterJoin = await bothJoined;
   expect(afterJoin.code).toBe("TEST1");

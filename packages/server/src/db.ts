@@ -11,6 +11,9 @@ export class Db {
     this.db.prepare("INSERT INTO rooms (code, snapshot) VALUES (?, ?) ON CONFLICT(code) DO UPDATE SET snapshot = excluded.snapshot")
       .run(s.code, JSON.stringify(s));
   }
+  has(code: string): boolean {
+    return this.db.prepare("SELECT 1 FROM rooms WHERE code = ?").get(code) !== undefined;
+  }
   loadAll(): RoomState[] {
     return this.db.prepare("SELECT snapshot FROM rooms").all()
       .map((r: any) => JSON.parse(r.snapshot) as RoomState);
