@@ -1,4 +1,5 @@
 app = "fc-draft-night"
+primary_region = "sjc"
 
 [build]
   dockerfile = "packages/server/Dockerfile"
@@ -7,6 +8,11 @@ app = "fc-draft-night"
   PORT = "8080"
   DB_PATH = "/data/fcdn.sqlite"
   NODE_ENV = "production"
+  # Required in production (server.ts). Must match the app's public URL: change it if the app name changes.
+  WEB_ORIGIN = "https://fc-draft-night.fly.dev"
+
+# Voice relay credentials are secrets, not config:
+#   fly secrets set TURN_URLS="..." TURN_USERNAME="..." TURN_CREDENTIAL="..."
 
 [[mounts]]
   source = "fcdn_data"
@@ -15,5 +21,13 @@ app = "fc-draft-night"
 [http_service]
   internal_port = 8080
   force_https = true
-  min_machines_running = 1
-  auto_stop_machines = false
+  # Sleep when nobody is connected, wake on the next visit. Rooms are restored from sqlite on start.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+# Rooms live in memory and the database is one volume, so this must stay a single machine.
+[[vm]]
+  size = "shared-cpu-1x"
+  # Measured ~300 MB idle (tsx runs the TypeScript source), so 384 is too tight.
+  memory = "512mb"
