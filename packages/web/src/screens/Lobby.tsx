@@ -123,7 +123,10 @@ export function Lobby({
               {poolBuilder}
               <div className="kickoff rise">
                 <p className="hint">{poolCount} pool player{poolCount === 1 ? "" : "s"} · {managers.length} manager{managers.length === 1 ? "" : "s"} in</p>
-                <button className="btn btn-flare btn-lg btn-block" onClick={onStart}>Start the draft</button>
+                {/* The server refuses to start a room with empty seats; mirror that so the host sees why. */}
+                <button className="btn btn-flare btn-lg btn-block" onClick={onStart} disabled={empties > 0}>
+                  {empties > 0 ? `Waiting for ${empties} more manager${empties === 1 ? "" : "s"}` : "Start the draft"}
+                </button>
               </div>
             </>
           ) : (

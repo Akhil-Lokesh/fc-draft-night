@@ -16,6 +16,17 @@ test("adding a manager reserves their club's squad value and sets spendable", ()
   expect(owned.every(p => p.listedValue === p.originalValue)).toBe(true);
 });
 
+test("adding a manager never takes a player another manager already owns", () => {
+  let s = createRoom({ code: "ABCD", totalBudget: 600, seed: fixtureSeed() });
+  const squad = Object.values(s.players).filter(p => p.homeClub === "real");
+  const stolen = squad[0]!;
+  s = { ...s, players: { ...s.players, [stolen.id]: { ...stolen, ownerId: "m_barca" } } };
+  s = addManager(s, { id: "m_real", displayName: "Ana", clubId: "real" });
+  expect(s.players[stolen.id]!.ownerId).toBe("m_barca"); // still with the manager who won him
+  const rest = squad.slice(1).reduce((sum, p) => sum + p.listedValue, 0);
+  expect(s.managers["m_real"]!.reserved).toBe(rest); // and his value isn't reserved against the newcomer
+});
+
 test("createRoom defaults capacity to 5 and honors an explicit capacity", () => {
   const s = createRoom({ code: "ABCD", totalBudget: 600, seed: fixtureSeed() });
   expect(s.capacity).toBe(5);

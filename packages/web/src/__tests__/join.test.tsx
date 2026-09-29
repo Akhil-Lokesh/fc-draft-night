@@ -15,6 +15,16 @@ test("entering code + name + club and submitting calls join once", async () => {
   expect(join).toHaveBeenCalledWith({ code: "AB12", displayName: "Ana", clubId: "real" });
 });
 
+test("a code with no room says so under the field and blocks joining", async () => {
+  const join = vi.fn();
+  render(<Join join={join} takenClubs={[]} notFound />);
+  await userEvent.type(screen.getByLabelText(/room code/i), "ZZZZZZ");
+  await userEvent.type(screen.getByLabelText(/name/i), "Ana");
+  await userEvent.click(screen.getByRole("button", { name: /real madrid/i }));
+  expect(screen.getByText(/no room with that code/i)).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^join$/i })).toBeDisabled();
+});
+
 test("a taken club is disabled", () => {
   render(<Join join={() => {}} takenClubs={["real"]} />);
   expect(screen.getByRole("button", { name: /real madrid/i })).toBeDisabled();

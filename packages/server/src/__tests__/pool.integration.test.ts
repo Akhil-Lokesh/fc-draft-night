@@ -15,12 +15,15 @@ test("searchCatalog + setPool inserts pool-eligible players pre-draft, and is re
   const clock = new FakeClock(0);
   const { store, url, io } = await boot(db, clock, "POOL1");
 
-  await store.create({ totalBudget: 1500 });
+  await store.create({ totalBudget: 1500, capacity: 2 });
 
   const a = client(url);
   const joined = new Promise<any>(res => a.on("state", res));
   a.emit("join", { code: "POOL1", displayName: "A", clubId: "city" });
   await joined;
+  // A room only starts once every seat is filled, so a second manager sits down before the draft.
+  const b = client(url);
+  await new Promise<any>(res => b.once("joined", res).emit("join", { code: "POOL1", displayName: "B", clubId: "bayern" }));
 
   // Search the real catalog for a known pool-eligible player.
   const results = await new Promise<any[]>(res => {
@@ -54,5 +57,6 @@ test("searchCatalog + setPool inserts pool-eligible players pre-draft, and is re
   expect(errMsg).toMatch(/setup|started/i);
 
   a.close();
+  b.close();
   io.close();
 });

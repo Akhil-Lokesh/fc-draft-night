@@ -54,6 +54,24 @@ test("a rival-owned player's card also shows position + specialty, then calls on
   expect(onChallenge).toHaveBeenCalledWith("mbappe", 210);
 });
 
+test("Challenge stays disabled until the bid beats the listed value, and says why", async () => {
+  const onChallenge = vi.fn();
+  render(<Market players={players as any} myId="m_bay" onList={() => {}} onChallenge={onChallenge} />);
+  await userEvent.click(screen.getByRole("tab", { name: /real madrid/i }));
+  await userEvent.click(screen.getByRole("button", { name: /Mbappé/ })); // listed at 200
+  const challenge = screen.getByRole("button", { name: /^challenge$/i }) as HTMLButtonElement;
+  const input = screen.getByLabelText(/bid amount/i);
+  expect(challenge.disabled).toBe(true); // nothing typed yet
+  await userEvent.type(input, "200");
+  expect(challenge.disabled).toBe(true); // equal to the listed value is not above it
+  expect(screen.getByText(/must be above/i)).toBeTruthy();
+  await userEvent.clear(input);
+  await userEvent.type(input, "201");
+  expect(challenge.disabled).toBe(false);
+  await userEvent.click(challenge);
+  expect(onChallenge).toHaveBeenCalledWith("mbappe", 201);
+});
+
 test("a rival card's Cancel button backs out without challenging", async () => {
   const onChallenge = vi.fn();
   render(<Market players={players as any} myId="m_bay" onList={() => {}} onChallenge={onChallenge} />);

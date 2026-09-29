@@ -12,7 +12,7 @@ import { boot } from "./helpers.js";
  */
 test("a client cannot spoof another manager's identity by supplying their managerId on join", async () => {
   const { store, url, io, http } = await boot(new Db(":memory:"), new FakeClock(0));
-  await store.create({ totalBudget: 1500 });
+  await store.create({ totalBudget: 1500, capacity: 2 });
 
   const a = client(url);
   const aJoined = new Promise<any>(res => a.once("joined", res));

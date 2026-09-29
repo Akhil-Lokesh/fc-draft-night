@@ -13,11 +13,21 @@ export type Command =
   | { type: "EndDraft"; now: number }
   | { type: "Tick"; now: number };
 
+/** Every auction command needs a running draft: not one still in its lobby, and not one already over. */
+function requireLive(s: RoomState): void {
+  if (s.status === "setup") throw new Error("the draft hasn't started yet");
+  if (s.status === "closed") throw new Error("the draft is over");
+}
+
 export function applyCommand(s: RoomState, cmd: Command): { state: RoomState; events: LogEntry[] } {
   const before = s.log.length;
   let state = s;
+  if (cmd.type !== "StartDraft" && cmd.type !== "Tick") requireLive(s);
   switch (cmd.type) {
     case "StartDraft":
+      // Only a lobby starts: a second start would reset the draft clock, and a closed draft stays closed.
+      if (s.status === "live") throw new Error("the draft has already started");
+      if (s.status === "closed") throw new Error("the draft is over");
       state = { ...s, status: "live", startedAt: cmd.now };
       break;
     case "OpenListing": {

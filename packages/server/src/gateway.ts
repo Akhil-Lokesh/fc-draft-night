@@ -86,9 +86,13 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
     // joined (and thus before their socket is in the room and would receive `state`).
     socket.on("peekRoom", (p: { code: string }) => {
       try {
+        // A miss is an ordinary answer, not an error: the Join screen peeks on every keystroke, so
+        // half-typed codes miss all the time. Each reply names its code so the client can drop stale ones.
         const existing = store.get(p.code);
-        if (!existing) { socket.emit("error", "no such room"); return; }
+        if (!existing) { socket.emit("roomPeek", { code: p.code, found: false }); return; }
         socket.emit("roomPeek", {
+          code: p.code,
+          found: true,
           capacity: existing.capacity,
           takenClubs: Object.values(existing.managers).map(m => m.clubId),
           managerCount: Object.keys(existing.managers).length,
@@ -141,7 +145,15 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
       return store.run(code, (s: RoomState) => applyCommand(s, make(s))).then(() => broadcast(code)).catch((e: Error) => socket.emit("error", e.message));
     };
 
-    socket.on("start", (p: { code: string }) => { if (asHost(p.code)) cmd(p.code, () => ({ type: "StartDraft", now: clock.now() })); });
+    // Only a full room may start: the check runs inside the room's queue, so a join racing the start can't slip past it.
+    socket.on("start", (p: { code: string }) => {
+      if (!asHost(p.code)) return;
+      cmd(p.code, (s) => {
+        const missing = s.capacity - Object.keys(s.managers).length;
+        if (missing > 0) throw new Error(`waiting for ${missing} more manager${missing === 1 ? "" : "s"}`);
+        return { type: "StartDraft", now: clock.now() };
+      });
+    });
     // OpenListing = claim a pool player or release your own (server infers which from ownership).
     socket.on("openListing", (p: { code: string; playerId: string }) =>
       cmd(p.code, () => ({ type: "OpenListing", managerId: joined!.managerId, playerId: p.playerId, now: clock.now() })));

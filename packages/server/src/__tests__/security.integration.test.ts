@@ -8,9 +8,9 @@ const joinAs = (c: Socket, p: Record<string, unknown>) =>
   new Promise<any>((res, rej) => { c.once("joined", res); c.once("error", rej); c.emit("join", { code: "TEST1", ...p }); });
 const nextError = (c: Socket) => new Promise<string>(res => c.once("error", res));
 
-async function room() {
+async function room(capacity?: number) {
   const env = await boot(new Db(":memory:"), new FakeClock(0));
-  await env.store.create({ totalBudget: 1500 });
+  await env.store.create({ totalBudget: 1500, ...(capacity ? { capacity } : {}) });
   return env;
 }
 
@@ -47,8 +47,40 @@ test("a stranger can't take over a seat with its guessable manager id or the own
   a.close(); thief.close(); io.close(); http.close();
 });
 
+test("the host can't start the draft until every seat is filled", async () => {
+  const { url, io, http, store } = await room(2);
+  const host = client(url), guest = client(url);
+  await joinAs(host, { displayName: "H", clubId: "city" });
+
+  const err = nextError(host);
+  host.emit("start", { code: "TEST1" });
+  expect(await err).toMatch(/waiting for 1 more/i);
+  expect(store.get("TEST1")!.status).toBe("setup");
+
+  await joinAs(guest, { displayName: "G", clubId: "bayern" });
+  const live = new Promise<void>(res => host.on("state", (st: any) => { if (st.status === "live") res(); }));
+  host.emit("start", { code: "TEST1" });
+  await live;
+  expect(store.get("TEST1")!.status).toBe("live");
+  host.close(); guest.close(); io.close(); http.close();
+});
+
+test("an auction can't be opened from the lobby, so the full-room rule can't be sidestepped", async () => {
+  const { url, io, http, store } = await room(2);
+  const host = client(url);
+  const { managerId } = await joinAs(host, { displayName: "H", clubId: "city" });
+  const mine = Object.values(store.get("TEST1")!.players).find(p => p.ownerId === managerId)!;
+
+  const err = nextError(host);
+  host.emit("openListing", { code: "TEST1", playerId: mine.id });
+  expect(await err).toMatch(/hasn't started/i);
+  expect(Object.keys(store.get("TEST1")!.contests)).toHaveLength(0);
+  expect(store.get("TEST1")!.status).toBe("setup");
+  host.close(); io.close(); http.close();
+});
+
 test("only the host can start or end the draft", async () => {
-  const { url, io, http, store } = await room();
+  const { url, io, http, store } = await room(2);
   const host = client(url), guest = client(url);
   await joinAs(host, { displayName: "H", clubId: "city" });
   await joinAs(guest, { displayName: "G", clubId: "bayern" });

@@ -24,6 +24,22 @@ test("tapping a manager reveals their existing squad; pool players are excluded"
   expect(screen.queryByText(/Free Agent/)).toBeNull(); // unowned → not in any squad
 });
 
+test("the host can't start until every seat is filled, and is told how many are missing", async () => {
+  const onStart = vi.fn();
+  render(<Lobby room={room} myId="m_arsenal" iAmHost onStart={onStart} />); // 1 of 5 seats taken
+  const start = screen.getByRole("button", { name: /waiting for 4 more/i }) as HTMLButtonElement;
+  expect(start.disabled).toBe(true);
+  await userEvent.click(start);
+  expect(onStart).not.toHaveBeenCalled();
+});
+
+test("once the room is full the host's Start button is live", async () => {
+  const onStart = vi.fn();
+  render(<Lobby room={{ ...room, capacity: 1 }} myId="m_arsenal" iAmHost onStart={onStart} />);
+  await userEvent.click(screen.getByRole("button", { name: /start the draft/i }));
+  expect(onStart).toHaveBeenCalledTimes(1);
+});
+
 test("the host's Leave control walks straight out, no approval needed", async () => {
   const onLeave = vi.fn();
   render(<Lobby room={room} myId="m_arsenal" iAmHost onStart={() => {}} onLeave={onLeave} />);

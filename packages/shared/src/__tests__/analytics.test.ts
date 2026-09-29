@@ -24,6 +24,28 @@ test("recapHighlights surfaces most spent + biggest overpay above original value
   expect(h.biggestOverpay.playerId).toBe("haaland"); // paid 220 vs original 180 = +40
 });
 
+const win = (playerId: string, price: number): LogEntry =>
+  ({ t: "win", at: 1, contestId: `c_${playerId}`, managerId: "m_bay", playerId, price });
+const valued = { overpaid: { originalValue: 100 }, bargain: { originalValue: 100 }, fair: { originalValue: 100 } };
+
+test("a win above the player's value is an overpay, never a bargain", () => {
+  const h = recapHighlights({ log: [win("overpaid", 120)], players: valued } as unknown as RoomState);
+  expect(h.bestBargain).toBeUndefined();
+  expect(h.biggestOverpay?.playerId).toBe("overpaid");
+});
+
+test("a win below the player's value is a bargain, never an overpay", () => {
+  const h = recapHighlights({ log: [win("bargain", 80)], players: valued } as unknown as RoomState);
+  expect(h.biggestOverpay).toBeUndefined();
+  expect(h.bestBargain?.playerId).toBe("bargain");
+});
+
+test("a win at exactly the player's value is neither a bargain nor an overpay", () => {
+  const h = recapHighlights({ log: [win("fair", 100)], players: valued } as unknown as RoomState);
+  expect(h.bestBargain).toBeUndefined();
+  expect(h.biggestOverpay).toBeUndefined();
+});
+
 test("playerTrail returns every quote for one player's contest, in order", () => {
   const s = { log, players } as unknown as RoomState;
   expect(playerTrail(s, "c1").map(b => b.amount)).toEqual([181, 220]);

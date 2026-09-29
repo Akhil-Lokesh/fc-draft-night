@@ -6,7 +6,7 @@ import { boot } from "./helpers.js";
 
 test("a joined client receives a state broadcast, and a challenge propagates to a second client", async () => {
   const { store, url, http, io } = await boot(new Db(":memory:"), new FakeClock(0));
-  await store.create({ totalBudget: 1500 }); // real FC26 dataset's budget floor
+  await store.create({ totalBudget: 1500, capacity: 2 }); // real FC26 dataset's budget floor
   const a = client(url), b = client(url);
 
   const bothJoined = new Promise<any>(res => b.on("state", res));
@@ -46,7 +46,7 @@ test("a joined client receives a state broadcast, and a challenge propagates to 
 
 test("the owner forfeiting a war over the socket resolves it immediately for everyone", async () => {
   const { store, url, http, io } = await boot(new Db(":memory:"), new FakeClock(0));
-  await store.create({ totalBudget: 1500 });
+  await store.create({ totalBudget: 1500, capacity: 2 });
   const a = client(url), b = client(url);
 
   const bothJoined = new Promise<any>(res => b.on("state", res));
@@ -84,7 +84,7 @@ test("the owner forfeiting a war over the socket resolves it immediately for eve
 
 test("host ending the draft over the socket closes the room for everyone", async () => {
   const { store, url, http, io } = await boot(new Db(":memory:"), new FakeClock(0));
-  await store.create({ totalBudget: 1500 });
+  await store.create({ totalBudget: 1500, capacity: 2 });
   const a = client(url), b = client(url);
 
   const bothJoined = new Promise<any>(res => b.on("state", res));
@@ -129,6 +129,24 @@ test("peekRoom on a room missing clubNames (legacy/corrupt data) degrades gracef
   const peek2 = await peeked2;
   expect(peek2.capacity).toBeGreaterThan(0);
 
+  a.close(); io.close(); http.close();
+});
+
+test("peeking a code with no room answers 'not found' for that code, never an error", async () => {
+  const { store, url, io, http } = await boot(new Db(":memory:"), new FakeClock(0));
+  await store.create({ totalBudget: 1500 });
+  const a = client(url);
+  const errors: string[] = [];
+  a.on("error", (m: string) => errors.push(m));
+
+  const missing = new Promise<any>(res => a.once("roomPeek", res));
+  a.emit("peekRoom", { code: "TES" }); // a half-typed code
+  expect(await missing).toEqual({ code: "TES", found: false });
+
+  const found = new Promise<any>(res => a.once("roomPeek", res));
+  a.emit("peekRoom", { code: "TEST1" }); // replies arrive in order, so this one follows any error too
+  expect(await found).toMatchObject({ code: "TEST1", found: true });
+  expect(errors).toEqual([]);
   a.close(); io.close(); http.close();
 });
 
@@ -179,7 +197,7 @@ test("a command sent before join completes returns a clear error, not a raw inte
 
 test("a client that leaves a room stops receiving that room's broadcasts", async () => {
   const { store, url, http, io } = await boot(new Db(":memory:"), new FakeClock(0));
-  await store.create({ totalBudget: 1500 });
+  await store.create({ totalBudget: 1500, capacity: 2 });
   const a = client(url), b = client(url);
 
   // b joins first so b is the host and can start the draft after a walks out.
@@ -205,8 +223,8 @@ test("a client that leaves a room stops receiving that room's broadcasts", async
 
 test("releasing your own player over the socket is instant — no contest appears, ownership/budget update in the same broadcast", async () => {
   const { store, url, http, io } = await boot(new Db(":memory:"), new FakeClock(0));
-  await store.create({ totalBudget: 1500 });
-  const a = client(url);
+  await store.create({ totalBudget: 1500, capacity: 2 });
+  const a = client(url), b = client(url);
 
   const joined = new Promise<any>(res => a.on("state", res));
   a.emit("join", { code: "TEST1", displayName: "A", clubId: "city" });
@@ -215,6 +233,12 @@ test("releasing your own player over the socket is instant — no contest appear
   const mine = Object.values(afterJoin.players as Record<string, any>).find((p: any) => p.ownerId === managerId) as any;
   expect(mine).toBeTruthy();
   const before = afterJoin.managers[managerId];
+
+  // Releasing belongs to a live draft: a second manager fills the room, then the host starts it.
+  await new Promise<any>(res => b.once("joined", res).emit("join", { code: "TEST1", displayName: "B", clubId: "bayern" }));
+  const live = new Promise<void>(res => a.on("state", (st: any) => { if (st.status === "live") res(); }));
+  a.emit("start", { code: "TEST1" });
+  await live;
 
   const afterRelease = new Promise<any>(res => a.on("state", (st: any) => {
     if (st.players[mine.id]?.ownerId === null) res(st);
@@ -229,7 +253,7 @@ test("releasing your own player over the socket is instant — no contest appear
   expect(after.reserved).toBe(before.reserved - mine.listedValue);
   expect(after.spendable).toBe(before.spendable + mine.listedValue);
 
-  a.close(); io.close(); http.close();
+  a.close(); b.close(); io.close(); http.close();
 });
 
 test("a guest leaving the lobby needs the host's approval, and approval frees their club", async () => {

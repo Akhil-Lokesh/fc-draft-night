@@ -33,6 +33,16 @@ test("joining assigns a club, reserves the squad, and blocks a taken club", asyn
   await expect(rs.join(code, { displayName: "Bo", clubId: "real" })).rejects.toThrow(/taken/i);
 });
 
+test("nobody can join once the draft has started, even with a free seat and an unclaimed club", async () => {
+  const rs = store();
+  const { code } = await rs.create({ totalBudget: 1500, capacity: 3 });
+  await rs.join(code, { displayName: "Ana", clubId: "real" });
+  await rs.join(code, { displayName: "Bo", clubId: "bayern" });
+  await rs.run(code, s => ({ state: { ...s, status: "live" }, events: [] }));
+  await expect(rs.join(code, { displayName: "Cy", clubId: "arsenal" })).rejects.toThrow(/already started/i);
+  expect(Object.keys(rs.get(code)!.managers)).toHaveLength(2);
+});
+
 test("capacity outside 2..number-of-real-clubs is rejected", async () => {
   const rs = store();
   await expect(rs.create({ totalBudget: 1500, capacity: 1 })).rejects.toThrow(/capacity/i);

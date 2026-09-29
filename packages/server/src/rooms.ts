@@ -110,6 +110,7 @@ export class RoomStore {
     const managerId = `m_${m.clubId}`;
     const { state } = await this.q.run(code, (s) => {
       if (!s) throw new Error("no such room");
+      if (s.status !== "setup") throw new Error("draft already started");
       if (Object.values(s.managers).some(x => x.clubId === m.clubId)) throw new Error("club taken");
       if (Object.keys(s.managers).length >= s.capacity) throw new Error("room full");
       return { state: addManager(s, { id: managerId, ...m }), events: [] };

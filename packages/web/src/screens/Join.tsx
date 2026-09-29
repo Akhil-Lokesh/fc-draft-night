@@ -17,6 +17,7 @@ export function Join({
   onCodeChange,
   clubs = DEFAULT_CLUBS,
   onBack,
+  notFound = false,
 }: {
   join: (p: JoinFields) => void;
   takenClubs: string[];
@@ -28,6 +29,8 @@ export function Join({
   /** This room's pickable clubs: an uploaded roster's, or the built-in 5. */
   clubs?: PickableClub[];
   onBack?: () => void;
+  /** The server says no room has the code typed so far. */
+  notFound?: boolean;
 }) {
   const [code, setCode] = useState(initialCode);
   const [displayName, setName] = useState("");
@@ -38,7 +41,8 @@ export function Join({
   );
   const pick = clubId ? clubColors[clubId] : undefined;
   const roomFull = capacity !== undefined && managerCount !== undefined && managerCount >= capacity;
-  const ready = !roomFull && code.trim().length > 0 && displayName.trim().length > 0 && clubId !== null;
+  const noRoom = notFound && code.trim().length > 0;
+  const ready = !roomFull && !noRoom && code.trim().length > 0 && displayName.trim().length > 0 && clubId !== null;
 
   const submit = () => {
     if (!ready) return;
@@ -77,6 +81,7 @@ export function Join({
           {capacity !== undefined && managerCount !== undefined && (
             <p className="hint">{managerCount} of {capacity} managers in</p>
           )}
+          {noRoom && <p className="hint">No room with that code yet. Check it with your host.</p>}
         </div>
 
         <div className="field">

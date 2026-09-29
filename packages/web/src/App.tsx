@@ -181,10 +181,11 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
     screen = (
       <Join
         join={doJoin}
-        takenClubs={roomPeek?.takenClubs ?? []}
-        capacity={roomPeek?.capacity}
-        managerCount={roomPeek?.managerCount}
-        clubs={roomPeek?.allClubs}
+        takenClubs={roomPeek?.found ? roomPeek.takenClubs : []}
+        capacity={roomPeek?.found ? roomPeek.capacity : undefined}
+        managerCount={roomPeek?.found ? roomPeek.managerCount : undefined}
+        clubs={roomPeek?.found ? roomPeek.allClubs : undefined}
+        notFound={roomPeek?.found === false}
         initialCode={createdCode || urlCode}
         onBack={createdCode ? undefined : goHome}
         onCodeChange={(code) => { if (code.trim()) store.getState().peekRoom(code.trim()); }}

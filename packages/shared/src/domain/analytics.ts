@@ -46,8 +46,9 @@ export function recapHighlights(s: RoomState) {
     ...w,
     delta: w.price - (s.players[w.playerId]?.originalValue ?? w.price),
   }));
-  const biggestOverpay = [...withDelta].sort((a, b) => b.delta - a.delta)[0];
-  const bestBargain = [...withDelta].sort((a, b) => a.delta - b.delta)[0];
+  // A bargain is a win under the player's value and an overpay one over it; a win at value is neither.
+  const biggestOverpay = withDelta.filter(w => w.delta > 0).sort((a, b) => b.delta - a.delta)[0];
+  const bestBargain = withDelta.filter(w => w.delta < 0).sort((a, b) => a.delta - b.delta)[0];
 
   return { mostSpent, biggestOverpay, bestBargain };
 }

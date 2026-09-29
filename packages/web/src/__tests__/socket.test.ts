@@ -106,9 +106,37 @@ test("peekRoom emits a peek and stores the server's roomPeek reply", () => {
   const store = makeStore(t as any);
   store.getState().peekRoom("AB");
   expect(t.emitted.at(-1)).toMatchObject({ ev: "peekRoom", p: { code: "AB" } });
-  const peek = { capacity: 3, takenClubs: ["real"], managerCount: 1, allClubs: [{ id: "real", label: "Real Madrid" }] };
+  const peek = { code: "AB", found: true, capacity: 3, takenClubs: ["real"], managerCount: 1, allClubs: [{ id: "real", label: "Real Madrid" }] };
   t.fire("roomPeek", peek);
   expect(store.getState().roomPeek).toEqual(peek);
+});
+
+test("peeking a code that doesn't exist neither raises an error nor forgets this device's seat", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  store.getState().join({ code: "AB", displayName: "A", clubId: "city" });
+  t.fire("joined", { managerId: "m_city", seatKey: "seat-key-seat-key-seat" });
+
+  store.getState().peekRoom("X");
+  t.fire("roomPeek", { code: "X", found: false });
+  expect(store.getState().error).toBeNull();
+  expect(store.getState().roomPeek).toEqual({ code: "X", found: false });
+
+  t.fire("connect", undefined); // a reconnect must still rejoin the seat this device holds
+  expect(t.emitted.at(-1)).toMatchObject({ ev: "join", p: { code: "AB", seatKey: "seat-key-seat-key-seat" } });
+});
+
+test("a peek reply for a code the player has since typed past is ignored", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  store.getState().peekRoom("AB");
+  t.fire("roomPeek", { code: "AB", found: true, capacity: 2, takenClubs: [], managerCount: 0, allClubs: [] });
+  store.getState().peekRoom("ABC");
+  expect(store.getState().roomPeek).toBeNull(); // the old room's clubs don't linger under a new code
+  t.fire("roomPeek", { code: "AB", found: true, capacity: 2, takenClubs: [], managerCount: 0, allClubs: [] });
+  expect(store.getState().roomPeek).toBeNull();
+  t.fire("roomPeek", { code: "ABC", found: false });
+  expect(store.getState().roomPeek).toEqual({ code: "ABC", found: false });
 });
 
 test("after leave(), stray state broadcasts from the old room are ignored and the server is told", () => {

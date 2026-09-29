@@ -17,12 +17,10 @@ export interface CreateOpts {
   rosterCsv?: string;
 }
 
-export interface RoomPeek {
-  capacity: number;
-  takenClubs: string[];
-  managerCount: number;
-  allClubs: { id: string; label: string }[];
-}
+/** The server's answer to a peek, always naming the code it answers for. */
+export type RoomPeek =
+  | { code: string; found: false }
+  | { code: string; found: true; capacity: number; takenClubs: string[]; managerCount: number; allClubs: { id: string; label: string }[] };
 
 export interface JoinPayload {
   code: string;
@@ -105,6 +103,8 @@ export function makeStore(t: Transport) {
   // The host key for the room this tab just created — attached to that room's first join only.
   // Kept in storage too: a refresh between "create" and "join" must not leave the room hostless.
   let hostKey: { code: string; key: string } | null = loadHostKey();
+  // The code most recently peeked; a reply for any other code is stale and ignored.
+  let peekedCode: string | null = null;
 
   const store = createStore<UiState>((set, get) => {
     const code = () => get().room?.code ?? get().createdCode ?? undefined;
@@ -126,7 +126,7 @@ export function makeStore(t: Transport) {
         if (hostKey?.code === p.code) payload = { ...payload, hostKey: hostKey.key };
         lastJoin = payload; persistJoin(payload); t.emit("join", payload);
       },
-      peekRoom: (code) => t.emit("peekRoom", { code }),
+      peekRoom: (code) => { peekedCode = code; set({ roomPeek: null }); t.emit("peekRoom", { code }); },
       start: () => t.emit("start", { code: code() }),
       openListing: (playerId) => t.emit("openListing", { code: code(), playerId }),
       challenge: (playerId, amount) => t.emit("challenge", { code: code(), playerId, amount }),
@@ -184,7 +184,7 @@ export function makeStore(t: Transport) {
   });
   t.on("catalogResults", (results: SeedPlayer[]) =>
     store.setState({ catalogResults: results as unknown as CatalogPlayer[] }));
-  t.on("roomPeek", (peek: RoomPeek) => store.setState({ roomPeek: peek }));
+  t.on("roomPeek", (peek: RoomPeek) => { if (peek.code === peekedCode) store.setState({ roomPeek: peek }); });
   t.on("seasonExport", (payload: { csv: string; filename: string }) =>
     store.setState({ seasonExport: payload }));
 

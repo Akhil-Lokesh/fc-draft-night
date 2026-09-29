@@ -21,7 +21,7 @@ test("multi-client replay: sync, ticker-driven overcommit cascade, and crash rec
   const clock = new FakeClock(0);
   const { store, url, http, io } = await boot(db, clock, "TEST1");
 
-  await store.create({ totalBudget: 1500 }); // real FC26 dataset's budget floor
+  await store.create({ totalBudget: 1500, capacity: 3 }); // real FC26 dataset's budget floor
 
   // --- Phase 1: multi-client join + real-time sync ---------------------------------------------
   const a = client(url); // city manager — will become the overcommitting bidder

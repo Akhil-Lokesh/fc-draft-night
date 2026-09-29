@@ -134,7 +134,8 @@ export function addManager(s: RoomState, m: { id: string; displayName: string; c
   const players = { ...s.players };
   let reserved = 0;
   for (const p of Object.values(players)) {
-    if (p.homeClub === m.clubId) {
+    // Never take a player someone else already holds: only the club's still-unowned squad joins this manager.
+    if (p.homeClub === m.clubId && !p.ownerId) {
       players[p.id] = { ...p, ownerId: m.id };
       reserved += p.listedValue;
     }

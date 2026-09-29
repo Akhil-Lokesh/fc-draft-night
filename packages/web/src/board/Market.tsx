@@ -68,6 +68,9 @@ export function Market({
   const row = (p: Player, kind: Kind) => {
     const open = openId === p.id;
     const hot = inAuction?.has(p.id);
+    // A challenge must open above the player's listed value; nothing typed yet is not a bid.
+    const bid = Number(amount);
+    const bidOk = amount !== "" && Number.isFinite(bid) && bid > p.listedValue;
     return (
       <li key={p.id} className={`mk ${open ? "is-open" : ""} ${p.lockedThisSeason ? "is-locked" : ""}`}>
         <button
@@ -100,6 +103,7 @@ export function Market({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
+                {amount !== "" && !bidOk && <span className="hint">Must be above {money(p.listedValue)}</span>}
               </label>
             )}
             <div className="scout-actions">
@@ -109,11 +113,8 @@ export function Market({
               ) : (
                 <button
                   className="btn btn-hot"
-                  onClick={() => {
-                    const n = Number(amount);
-                    if (Number.isFinite(n) && n > 0) onChallenge(p.id, n);
-                    close();
-                  }}
+                  disabled={!bidOk}
+                  onClick={() => { onChallenge(p.id, Number(amount)); close(); }}
                 >
                   Challenge
                 </button>
