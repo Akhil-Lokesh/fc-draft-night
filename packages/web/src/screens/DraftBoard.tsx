@@ -102,7 +102,7 @@ export function DraftBoard({
       <div className="board-grid">
         <div className="pane pane-squad" data-for="squad">
           <Section title="Your squad" aside={<span className="hint">Tap a player to scout &amp; release</span>}>
-            <MySquad {...squad} managers={room.managers} now={now} onRelease={actions.openListing} />
+            <MySquad {...squad} managers={room.managers} now={now} onRelease={actions.openListing} inContest={inAuction} />
           </Section>
         </div>
 

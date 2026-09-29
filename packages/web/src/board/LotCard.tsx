@@ -2,7 +2,7 @@ import { useState, type CSSProperties } from "react";
 import type { Contest, Player } from "@fcdn/shared";
 import { mmss, money, positionLabel } from "../lib/format.js";
 import { QUOTE_CAP, type Leader, type WarSide } from "../lib/board.js";
-import { useClubColor, useClubLabel } from "../lib/clubs.js";
+import { clubShort, useClubColor, useClubLabel, useClubNames } from "../lib/clubs.js";
 import { Crest, Flap, Pos, useClubVars } from "../ui/primitives.js";
 
 const URGENT_MS = 30_000;
@@ -40,6 +40,8 @@ export function LotCard({
   const label = useClubLabel();
   const clubVars = useClubVars();
   const colorOf = useClubColor();
+  const names = useClubNames();
+  const short = (id: string) => clubShort(id, names);
   const top = contest.quotes.at(-1);
   const topBid = top?.amount ?? player.listedValue;
   const min = topBid + 1;
@@ -88,7 +90,8 @@ export function LotCard({
               <div key={k} className={`vs-side vs-${k} ${sd.leading ? "is-leading" : ""}`}>
                 <Crest clubId={sd.clubId} size={22} />
                 <span className="vs-team">
-                  <span className="vs-club">{label(sd.clubId)}</span>
+                  {/* short code: two full club names never fit side by side on a lot card */}
+                  <span className="vs-club" title={label(sd.clubId)}>{short(sd.clubId)}</span>
                   <span className="vs-mgr">{sd.you ? "You" : sd.displayName}{sd.leading ? " · leading" : ""}</span>
                 </span>
               </div>

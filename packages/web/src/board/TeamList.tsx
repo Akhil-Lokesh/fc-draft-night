@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { Manager, Player } from "@fcdn/shared";
-import { positionLabel } from "../lib/format.js";
 import { squadOf } from "../lib/board.js";
 import { useClubLabel } from "../lib/clubs.js";
 import { Crest, Money, Pos, useClubVars } from "../ui/primitives.js";
@@ -46,7 +45,8 @@ export function TeamList({
                   {squad.map((p) => (
                     <li key={p.id} className="roster-row">
                       <span className="roster-name">{p.shirtNumber ? <i>{p.shirtNumber}</i> : null}{p.name}</span>
-                      <Pos>{positionLabel(p)}</Pos>
+                      {/* main position only — alternates crowd the name out of this narrow list */}
+                      <Pos>{p.positionDetail ?? p.position}</Pos>
                       <Money n={p.listedValue} />
                     </li>
                   ))}

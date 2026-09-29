@@ -137,3 +137,15 @@ test("no Listed band when nothing is currently up for release", () => {
   render(<MySquad listed={[]} sold={[]} starting={[]} acquired={[]} managers={managers as any} now={0} onRelease={() => {}} />);
   expect(screen.queryByText(/awaiting a buyer/i)).toBeNull();
 });
+
+test("a player in a live contest can be scouted but not released", async () => {
+  const released: string[] = [];
+  const rodri = { id: "a", name: "Rodri", position: "MID", listedValue: 10, originalValue: 10, ownerId: "m_city", lockedThisSeason: false, homeClub: "city" };
+  render(
+    <MySquad listed={[]} sold={[]} starting={[rodri] as any} acquired={[]} managers={managers as any} now={0}
+      onRelease={(id) => released.push(id)} inContest={new Set(["a"])} />,
+  );
+  await userEvent.click(screen.getByRole("button", { name: /Rodri/ }));
+  expect(screen.getByRole("button", { name: /^release/i })).toBeDisabled();
+  expect(screen.getByText(/live contest/i)).toBeTruthy();
+});

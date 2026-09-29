@@ -12,3 +12,6 @@ dist/
 # Raw source datasets (10 MB+). Re-downloadable — see packages/server/src/data/fc26-data.sources.md
 /FC26_*.csv
 /archive/
+
+# TURN relay credentials for voice (scripts/play-online.sh)
+.env.turn

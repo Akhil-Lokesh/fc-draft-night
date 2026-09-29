@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import {
-  createRoom, addManager, addPoolPlayer, squadValue, positionStepBudgets, startNextSeason,
+  createRoom, addManager, addPoolPlayer, squadValue, positionStepBudgets, startNextSeason, MAX_MANAGERS,
   type RoomState, type SeedPlayer, type ClubId,
 } from "@fcdn/shared";
 import type { Queue } from "./queue.js";
@@ -54,9 +54,10 @@ export class RoomStore {
 
   get(code: string) { return this.q.getState(code); }
 
-  /** How many distinct real clubs a seed actually has squads for — the hard ceiling on room capacity. */
+  /** Room capacity ceiling: the distinct real clubs the seed has squads for, and never more than
+   *  MAX_MANAGERS (one per team colour). */
   private maxCapacity(seed: SeedPlayer[]): number {
-    return new Set(seed.map(p => p.clubId).filter((c): c is ClubId => c != null)).size;
+    return Math.min(MAX_MANAGERS, new Set(seed.map(p => p.clubId).filter((c): c is ClubId => c != null)).size);
   }
 
   async create(opts: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number; rosterCsv?: string }): Promise<{ code: string }> {

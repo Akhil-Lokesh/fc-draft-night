@@ -54,3 +54,12 @@ test("ten teams in one room all get different colours", () => {
   for (let i = 0; i < 10; i++) s = addManager(s, { id: `m_c${i}`, displayName: `T${i}`, clubId: `club-${i}` });
   expect(new Set(Object.values(s.managers).map((m) => m.colorId)).size).toBe(10);
 });
+
+test("a roster with more than 10 clubs never gives two joined managers the same colour", () => {
+  let s = createRoom({ code: "ABCD", totalBudget: 600, seed: [] });
+  s = { ...s, clubNames: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`c${i}`, `Club ${i}`])) };
+  s = addManager(s, { id: "m_c0", displayName: "A", clubId: "c0" });   // slot 0 → red
+  s = addManager(s, { id: "m_c10", displayName: "B", clubId: "c10" }); // slot 10 wraps to red → must not
+  expect(s.managers.m_c0!.colorId).toBe("red");
+  expect(s.managers.m_c10!.colorId).not.toBe("red");
+});

@@ -24,11 +24,17 @@ export const TEAM_PALETTE: TeamColor[] = [
   { id: "bronze", color: "#c8925a", ink: "#1a0f03" },
 ];
 
+/** Most managers a room can hold: one per team colour, so no two managers ever share a colour. */
+export const MAX_MANAGERS = 10;
+
 /** The colour a club gets in this room: its position in the room's club list picks the palette
- *  slot. A club not in that list falls back to the first colour nobody has yet. */
+ *  slot. If that slot is already someone's (a roster with more than 10 clubs wraps around), or the
+ *  club isn't in the list, it takes the first colour nobody has yet — never a duplicate. */
 export function colorForClub(s: RoomState, clubId: string, used: Iterable<string> = []): string {
+  const taken = new Set(used);
   const i = Object.keys(s.clubNames).indexOf(clubId);
-  return i >= 0 ? TEAM_PALETTE[i % TEAM_PALETTE.length]!.id : pickColor(used);
+  const slot = i >= 0 ? TEAM_PALETTE[i % TEAM_PALETTE.length]!.id : null;
+  return slot && !taken.has(slot) ? slot : pickColor(taken);
 }
 
 /** The first colour in palette order that nobody in the room has yet. */

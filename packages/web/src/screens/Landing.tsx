@@ -20,7 +20,7 @@ export function Landing({ onHost, onJoin }: { onHost: () => void; onJoin: () => 
       <div className="floodlights" aria-hidden="true" />
       <header className="hero">
         <h1 className="sr-only">FC Draft Night</h1>
-        <p className="kicker rise">Live transfer-market draft · for 2–5 managers</p>
+        <p className="kicker rise">Live transfer-market draft · for 2 or more managers</p>
         <div className="rise" style={{ animationDelay: "60ms" }}><Brand size="xl" /></div>
         <p className="hero-lede rise" style={{ animationDelay: "120ms" }}>
           One budget each. Real squads. Bid, challenge and poach your way to the best XI before the deadline.

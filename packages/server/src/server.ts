@@ -1,4 +1,7 @@
 import { createServer } from "node:http";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { staticHandler } from "./static.js";
 import { Server } from "socket.io";
 import { RoomStore, uniqueCode } from "./rooms.js";
 import { Queue } from "./queue.js";
@@ -15,7 +18,10 @@ if (process.env.NODE_ENV === "production" && !origin) {
   throw new Error("WEB_ORIGIN required in production");
 }
 
-const http = createServer();
+// When the web app has been built (pnpm --filter web build), serve it from here too: one port, one
+// public link for page + socket.io. Without a build this stays a socket-only server for `vite` dev.
+const webDist = process.env.WEB_DIST ?? fileURLToPath(new URL("../../web/dist", import.meta.url));
+const http = existsSync(webDist) ? createServer(staticHandler(webDist)) : createServer();
 const io = new Server(http, { cors: { origin: origin ?? "*" } });
 const q = new Queue<RoomState>();
 const db = new Db(process.env.DB_PATH ?? "fcdn.sqlite");

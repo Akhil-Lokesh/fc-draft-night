@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MAX_MANAGERS } from "@fcdn/shared";
 import { Brand } from "../ui/primitives.js";
 
 export interface StartConfig {
@@ -55,7 +56,8 @@ export function Setup({
   const [capacity, setCapacity] = useState(maxCapacity);
   const [error, setError] = useState<string | null>(null);
 
-  const effectiveMax = rosterCsv ? Math.max(2, countClubs(rosterCsv)) : maxCapacity;
+  // One colour per manager: never more than MAX_MANAGERS, however many clubs a roster names.
+  const effectiveMax = Math.min(MAX_MANAGERS, rosterCsv ? Math.max(2, countClubs(rosterCsv)) : maxCapacity);
   const capacityOptions = Array.from({ length: effectiveMax - 1 }, (_, i) => i + 2);
 
   const onRosterFile = (file: File | undefined) => {
@@ -65,7 +67,7 @@ export function Setup({
       const text = String(reader.result ?? "");
       setRosterCsv(text);
       setRosterName(file.name);
-      setCapacity(Math.max(2, countClubs(text)));
+      setCapacity(Math.min(MAX_MANAGERS, Math.max(2, countClubs(text))));
     };
     reader.readAsText(file);
   };

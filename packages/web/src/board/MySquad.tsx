@@ -23,6 +23,7 @@ export function MySquad({
   managers,
   now,
   onRelease,
+  inContest,
 }: {
   listed: ListedPlayer[];
   sold: SoldPlayer[];
@@ -32,6 +33,8 @@ export function MySquad({
   /** Current time, for the "closes in" countdown on a listed player. */
   now: number;
   onRelease: (playerId: string) => void;
+  /** Players in a live war/listing right now — they can't be released until it settles. */
+  inContest?: Set<string>;
 }) {
   const clubLabel = useClubLabel();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -39,6 +42,7 @@ export function MySquad({
 
   const card = (p: Player) => {
     const open = openId === p.id;
+    const busy = !!inContest?.has(p.id);
     return (
       <li key={p.id} className={`sq-item ${open ? "is-open" : ""} ${p.lockedThisSeason ? "is-locked" : ""}`}>
         <button
@@ -59,10 +63,12 @@ export function MySquad({
          *  cards — so releasing a player is never a blind confirm on a bare row. */}
         {open && (
           <div className="scout">
-            <PlayerCard player={p}>
+            <PlayerCard player={p} flags={busy ? ["In a live war"] : undefined}>
+              {/* The server refuses to release a player mid-contest; say so instead of offering it. */}
+              {busy && <p className="scout-note">He's in a live contest — you can release him once it settles.</p>}
               <div className="scout-actions">
                 <button className="btn btn-ghost" onClick={close}>Cancel</button>
-                <button className="btn btn-hot" onClick={() => { onRelease(p.id); close(); }}>
+                <button className="btn btn-hot" disabled={busy} onClick={() => { onRelease(p.id); close(); }}>
                   Release · <Money n={p.listedValue} />
                 </button>
               </div>

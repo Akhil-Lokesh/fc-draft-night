@@ -283,6 +283,7 @@
 .scout-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .scout-amount { display: flex; flex-direction: column; }
 .scout-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.scout-note { margin: 0; font-size: 12px; color: #ff9c92; }
 .scout-actions .btn { min-width: 110px; }
 
 /* ── my squad bands ───────────────────────────────────────── */
