@@ -63,7 +63,11 @@ export function PoolBuilder({
         })}
       </ul>
       {results.length === 0 && (
-        <p className="empty">Search to add pool players, or leave it empty to draft only the real squads.</p>
+        q.trim() ? (
+          <p className="empty">No one found. Players already in this room's squads or pool aren't listed here.</p>
+        ) : (
+          <p className="empty">Search to add pool players, or leave it empty to draft only the real squads.</p>
+        )
       )}
       <button className="btn btn-chalk btn-block" onClick={() => onConfirm(selected)}>
         Confirm pool ({selected.length})

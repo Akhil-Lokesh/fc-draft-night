@@ -17,6 +17,15 @@ test("typing a query calls search; picking players and confirming emits the chos
   expect(onConfirm).toHaveBeenCalled();
 });
 
+test("a search that finds nobody says why, instead of repeating the starting hint", async () => {
+  render(<PoolBuilder results={[]} selected={[]} onSearch={() => {}} onToggle={() => {}} onConfirm={() => {}} />);
+  expect(screen.getByText(/search to add pool players/i)).toBeTruthy(); // nothing typed yet
+  await userEvent.type(screen.getByPlaceholderText(/search the fc 26 catalog/i), "zzzz");
+  expect(screen.queryByText(/search to add pool players/i)).toBeNull();
+  expect(screen.getByText(/no one found/i)).toBeTruthy();
+  expect(screen.getByText(/already in this room/i)).toBeTruthy(); // the usual reason for a known name
+});
+
 test("selected players show a running count", () => {
   render(<PoolBuilder results={results as any} selected={["l1"]} onSearch={() => {}} onToggle={() => {}} onConfirm={() => {}} />);
   expect(screen.getByText(/1 selected/i)).toBeTruthy();

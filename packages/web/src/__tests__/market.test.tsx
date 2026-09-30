@@ -16,6 +16,21 @@ test("search filters the list by name across every group", async () => {
   expect(screen.queryByText(/Mbappé/)).toBeNull();
 });
 
+test("search ignores accents and understands a full first name", async () => {
+  const pool = {
+    ode: { id: "ode", name: "M. Ødegaard", position: "MID", listedValue: 98, ownerId: null },
+    erl: { id: "erl", name: "E. Haaland", position: "FWD", listedValue: 180, ownerId: null },
+    mh:  { id: "mh",  name: "M. Haaland", position: "FWD", listedValue: 3, ownerId: null },
+  };
+  render(<Market players={pool as any} myId="m_bay" onList={() => {}} onChallenge={() => {}} />);
+  await userEvent.type(screen.getByPlaceholderText(/search/i), "odegaard");
+  expect(screen.getByText(/Ødegaard/)).toBeTruthy();
+  await userEvent.clear(screen.getByPlaceholderText(/search/i));
+  await userEvent.type(screen.getByPlaceholderText(/search/i), "erling haaland");
+  expect(screen.getByText("E. Haaland")).toBeTruthy();
+  expect(screen.queryByText("M. Haaland")).toBeNull();
+});
+
 test("clicking an unowned player opens a confirm card with position + specialty, not an immediate claim", async () => {
   const onList = vi.fn();
   render(<Market players={players as any} myId="m_bay" onList={onList} onChallenge={() => {}} />);

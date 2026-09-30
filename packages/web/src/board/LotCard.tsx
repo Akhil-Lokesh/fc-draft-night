@@ -44,10 +44,14 @@ export function LotCard({
   const short = (id: string) => clubShort(id, names);
   const top = contest.quotes.at(-1);
   const topBid = top?.amount ?? player.listedValue;
-  const min = topBid + 1;
-  const [raise, setRaise] = useState<number>(min);
-  // Someone outbid us while we were typing: never offer a raise below the new top.
-  const amount = raise < min ? min : raise;
+  // What the box offers until you touch it: one above the top bid (it follows the top if someone outbids).
+  const suggested = topBid + 1;
+  // The box holds exactly what was typed — clamping it on every keystroke made typing a price impossible.
+  // The server's only rule is "more than the top bid", so any number above it, decimals included, is fine.
+  const [draft, setDraft] = useState<string | null>(null);
+  const typed = draft ?? String(suggested);
+  const amount = typed.trim() === "" ? NaN : Number(typed);
+  const amountOk = Number.isFinite(amount) && amount > topBid;
 
   const remaining = contest.closesAt - now;
   const urgent = remaining <= URGENT_MS;
@@ -128,22 +132,27 @@ export function LotCard({
       </div>
 
       <div className="lot-bid">
+        <label className="bid-caption" htmlFor={`bid-${contest.id}`}>Your price · tap to type any amount, or use a step</label>
         <div className="steps">
           {STEPS.map((s) => (
-            <button key={s} type="button" className="step" disabled={disabled} onClick={() => setRaise(topBid + s)}>+{s}</button>
+            <button key={s} type="button" className="step" disabled={disabled} onClick={() => setDraft(String(topBid + s))}>+{s}</button>
           ))}
           <input
+            id={`bid-${contest.id}`}
             className="input input-bid"
             type="number"
+            inputMode="decimal"
+            step="any"
             aria-label="raise amount"
-            value={amount}
-            min={min}
+            value={typed}
             disabled={disabled}
-            onChange={(e) => setRaise(Number(e.target.value))}
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => setDraft(e.target.value)}
           />
         </div>
-        <button className="btn btn-flare btn-block" disabled={disabled} onClick={() => onBid(contest.id, amount)}>
-          {isListing ? "Bid" : "Raise"} · {money(amount)}
+        {!disabled && !amountOk && <p className="bid-hint" role="status">Must be above {money(topBid)}</p>}
+        <button className="btn btn-flare btn-block" disabled={disabled || !amountOk} onClick={() => onBid(contest.id, amount)}>
+          {isListing ? "Bid" : "Raise"} · {amountOk ? money(amount) : "enter a price"}
         </button>
       </div>
 

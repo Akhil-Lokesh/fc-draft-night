@@ -1,12 +1,10 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { TEAM_PALETTE } from "@fcdn/shared";
-import { CLUBS, TeamColors } from "../lib/clubs.js";
+import { TeamColors } from "../lib/clubs.js";
 import { Brand, Crest } from "../ui/primitives.js";
 
 export interface JoinFields { code: string; displayName: string; clubId: string }
 export interface PickableClub { id: string; label: string }
-
-const DEFAULT_CLUBS: PickableClub[] = CLUBS.map((c) => ({ id: c.id, label: c.label }));
 
 export function Join({
   join,
@@ -15,7 +13,7 @@ export function Join({
   managerCount,
   initialCode = "",
   onCodeChange,
-  clubs = DEFAULT_CLUBS,
+  clubs = [],
   onBack,
   notFound = false,
 }: {
@@ -26,7 +24,8 @@ export function Join({
   initialCode?: string;
   /** Fires as the code changes so the caller can peek capacity / taken clubs live. */
   onCodeChange?: (code: string) => void;
-  /** This room's pickable clubs: an uploaded roster's, or the built-in 5. */
+  /** This room's pickable clubs, known once its code has been looked up. Nothing is assumed before then:
+   *  a room built from your own roster must never start out showing someone else's teams. */
   clubs?: PickableClub[];
   onBack?: () => void;
   /** The server says no room has the code typed so far. */
@@ -95,6 +94,7 @@ export function Join({
           {/* Each club's team colour is its slot in the room's club list — the same colour it will
            *  have in the room — so show it right here while choosing. */}
           <TeamColors.Provider value={clubColors}>
+          {clubs.length === 0 && !notFound && <p className="hint">Enter the room code to see its teams.</p>}
           <div className="club-grid" role="group" aria-labelledby="club-label">
             {clubs.map((c) => {
               const clubTaken = takenClubs.includes(c.id);

@@ -26,6 +26,64 @@ test("a raise button emits a bid above the current top", async () => {
   expect(onBid).toHaveBeenCalledWith("c1", expect.any(Number));
 });
 
+const lot = (c = contest) => <LotCard contest={c as any} player={player as any} now={0} myId="bay" myQuotesUsed={0} onBid={onBidSpy} />;
+let onBidSpy = vi.fn();
+const priceBox = () => screen.getByLabelText(/raise amount/i) as HTMLInputElement;
+
+test("you can clear the price box and type any price you like", async () => {
+  onBidSpy = vi.fn();
+  render(lot());
+  await userEvent.clear(priceBox());
+  expect(priceBox().value).toBe(""); // used to snap straight back to the minimum
+  await userEvent.type(priceBox(), "250");
+  expect(priceBox().value).toBe("250");
+  await userEvent.click(screen.getByRole("button", { name: /raise/i }));
+  expect(onBidSpy).toHaveBeenCalledWith("c1", 250);
+});
+
+test("the price can be a decimal just above the top bid", async () => {
+  onBidSpy = vi.fn();
+  render(lot());
+  await userEvent.clear(priceBox());
+  await userEvent.type(priceBox(), "205.5");
+  await userEvent.click(screen.getByRole("button", { name: /raise/i }));
+  expect(onBidSpy).toHaveBeenCalledWith("c1", 205.5);
+});
+
+test("a price at or below the top bid is flagged and can't be sent", async () => {
+  onBidSpy = vi.fn();
+  render(lot());
+  for (const bad of ["205", "200", "0"]) {
+    await userEvent.clear(priceBox());
+    await userEvent.type(priceBox(), bad);
+    expect(screen.getByText(/must be above/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /raise/i })).toBeDisabled();
+  }
+  expect(onBidSpy).not.toHaveBeenCalled();
+});
+
+test("an empty price box can't be sent, and says what is needed", async () => {
+  render(lot());
+  await userEvent.clear(priceBox());
+  expect(screen.getByRole("button", { name: /raise/i })).toBeDisabled();
+  expect(screen.getByText(/must be above/i)).toBeTruthy();
+});
+
+test("the +5 step still fills the price box", async () => {
+  onBidSpy = vi.fn();
+  render(lot());
+  await userEvent.click(screen.getByRole("button", { name: "+5" }));
+  expect(priceBox().value).toBe("210");
+});
+
+test("an untouched price box follows the new minimum when someone outbids", () => {
+  onBidSpy = vi.fn();
+  const { rerender } = render(lot());
+  expect(priceBox().value).toBe("206");
+  rerender(lot({ ...contest, quotes: [{ managerId: "city", amount: 220, at: 1 }] } as any));
+  expect(priceBox().value).toBe("221");
+});
+
 test("raise is disabled once the manager has used two quotes", () => {
   render(<LotCard contest={contest as any} player={player as any} now={0} myId="city" myQuotesUsed={2} onBid={() => {}} />);
   expect(screen.getByRole("button", { name: /raise/i })).toBeDisabled();

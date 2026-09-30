@@ -133,7 +133,7 @@ export function makeStore(t: Transport) {
       bid: (contestId, amount) => t.emit("bid", { code: code(), contestId, amount }),
       forfeit: (contestId) => t.emit("forfeit", { code: code(), contestId }),
       endDraft: () => t.emit("endDraft", { code: code() }),
-      search: (q) => t.emit("searchCatalog", q),
+      search: (q) => t.emit("searchCatalog", { ...q, code: code() }),
       setPool: (ids) => t.emit("setPool", { code: code(), ids }),
       exportSeason: () => t.emit("exportSeason", { code: code() }),
       importSeason: (csv, base, step) => t.emit("importSeason", { code: code(), csv, base, step }),

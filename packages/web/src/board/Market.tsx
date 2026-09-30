@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import type { Manager, Player } from "@fcdn/shared";
+import { matchesName, type Manager, type Player } from "@fcdn/shared";
 import { money } from "../lib/format.js";
 import { byValueDesc } from "../lib/board.js";
 import { clubLabel, useClubNames } from "../lib/clubs.js";
@@ -37,9 +37,8 @@ export function Market({
   const [tab, setTab] = useState("pool");
 
   const { pool, mine, rivals } = useMemo(() => {
-    const q = query.trim().toLowerCase();
     const shown = Object.values(players).filter(
-      (p) => (!q || p.name.toLowerCase().includes(q)) && (line === "All" || p.position === line),
+      (p) => matchesName(p.name, query) && (line === "All" || p.position === line),
     );
     // Every rival gets a group, even one who currently owns nobody, so all teams stay reachable.
     const byOwner = new Map<string, Player[]>(

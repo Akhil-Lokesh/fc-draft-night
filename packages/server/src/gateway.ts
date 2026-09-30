@@ -170,8 +170,11 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
     socket.on("endDraft", (p: { code: string }) => { if (asHost(p.code)) cmd(p.code, () => ({ type: "EndDraft", now: clock.now() })); });
 
     // Stateless request/response over the full FC26 catalog — no room mutation.
-    socket.on("searchCatalog", (q: { q?: string; position?: string; club?: string; limit?: number }) => {
-      socket.emit("catalogResults", catalog.search(q));
+    // With a room code it leaves out players already in that room (squads and pool), so the host
+    // is only offered people who can still be added.
+    socket.on("searchCatalog", (q: { q?: string; position?: string; club?: string; limit?: number; code?: string }) => {
+      const room = q.code ? store.get(q.code) : undefined;
+      socket.emit("catalogResults", catalog.search(q, room ? new Set(Object.keys(room.players)) : undefined));
     });
 
     // Host curates which pool-eligible catalog players join this room's draft pool.

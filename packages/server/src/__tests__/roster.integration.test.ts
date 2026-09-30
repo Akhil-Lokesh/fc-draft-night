@@ -69,6 +69,66 @@ test("setPool rejects players from a club already claimed by a manager in this r
 });
 
 /**
+ * Pool search is per room: it hides only the players already in THIS room (squads, pool), and lets
+ * the host pick anyone else — including stars of the five built-in clubs when this room doesn't use them.
+ */
+test("pool search hides players already in the room but finds everyone else, built-in clubs' stars included", async () => {
+  const { url, io, http } = await boot(new Db(":memory:"), new FakeClock(0));
+  const a = client(url);
+  const csv = "club,player\nChelsea,C. Palmer\nChelsea,M. Caicedo\nAtletico Madrid,J. Alvarez\n";
+  const created = new Promise<any>(res => a.once("created", res));
+  a.emit("create", { totalBudget: 300, rosterCsv: csv });
+  const { code, hostKey } = await created;
+  const joined = new Promise<any>(res => a.once("joined", res));
+  a.emit("join", { code, displayName: "Ana", clubId: "chelsea", hostKey });
+  await joined;
+
+  const search = (q: Record<string, unknown>) => new Promise<any[]>(res => { a.once("catalogResults", res); a.emit("searchCatalog", q); });
+
+  const palmers = await search({ q: "palmer", code });
+  expect(palmers.some((p: any) => p.name === "C. Palmer")).toBe(false); // already in Chelsea's squad here
+  expect(palmers.length).toBeGreaterThan(0); // other Palmers remain
+
+  const musiala = await search({ q: "musiala", code });
+  expect(musiala.map((p: any) => p.club)).toContain("FC Bayern München"); // Bayern isn't in this room
+
+  a.close(); io.close(); http.close();
+});
+
+test("the host can put a built-in club's star into a roster room's pool", async () => {
+  const { url, io, http } = await boot(new Db(":memory:"), new FakeClock(0));
+  const a = client(url);
+  const csv = "club,player\nChelsea,C. Palmer\nAtletico Madrid,J. Alvarez\n";
+  const created = new Promise<any>(res => a.once("created", res));
+  a.emit("create", { totalBudget: 300, rosterCsv: csv });
+  const { code, hostKey } = await created;
+  const joined = new Promise<any>(res => a.once("joined", res));
+  a.emit("join", { code, displayName: "Ana", clubId: "chelsea", hostKey });
+  await joined;
+
+  const hits = await new Promise<any[]>(res => { a.once("catalogResults", res); a.emit("searchCatalog", { q: "musiala", code }); });
+  const musiala = hits.find((p: any) => p.club === "FC Bayern München")!;
+  expect(musiala).toBeTruthy();
+
+  const stateAfter = new Promise<any>(res => a.once("state", res));
+  a.emit("setPool", { code, ids: [musiala.id] });
+  const st = await stateAfter;
+  expect(st.players[musiala.id]).toBeTruthy();
+  expect(st.players[musiala.id].ownerId).toBeNull(); // a free agent anyone can claim
+
+  a.close(); io.close(); http.close();
+});
+
+test("in a built-in room, players already in the room don't show up in pool search again", async () => {
+  const { url, io, http, store } = await boot(new Db(":memory:"), new FakeClock(0));
+  await store.create({ totalBudget: 1500 });
+  const a = client(url);
+  const hits = await new Promise<any[]>(res => { a.once("catalogResults", res); a.emit("searchCatalog", { q: "musiala", code: "TEST1" }); });
+  expect(hits.filter((p: any) => p.club === "FC Bayern München")).toEqual([]); // Bayern's squad is already in this room
+  a.close(); io.close(); http.close();
+});
+
+/**
  * End-to-end: the richer tournament CSV format (metadata + TEAMS + SQUADS + POOL sections)
  * over the real socket — season number, per-club finishing-position budget differential, and
  * pool players are all live in room state from the moment the room is created.
