@@ -137,6 +137,7 @@
 }
 .dock-btn {
   position: relative;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
   min-height: 48px;
   border: 0;
   border-radius: 10px;
@@ -147,8 +148,9 @@
   text-transform: uppercase;
 }
 .dock-btn.is-on { color: var(--flare-ink); background: var(--flare); }
+/* Sits beside the label, not over it: "SQUAD" plus a two-digit count fits a 360px phone's quarter. */
 .dock-badge {
-  position: absolute; top: 4px; right: 10%;
+  flex: none;
   min-width: 18px; height: 18px; padding: 0 5px;
   display: grid; place-items: center;
   border-radius: 999px;

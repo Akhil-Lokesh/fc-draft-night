@@ -25,7 +25,8 @@ export function FullTime({
   const [view, setView] = useState<"list" | "pitch">("list");
 
   const awards = [
-    { title: "Most spent", who: mgr(h.mostSpent.managerId), n: h.mostSpent.amount },
+    // Nobody bought anyone: there's no top spender to name.
+    h.mostSpent.amount > 0 && { title: "Most spent", who: mgr(h.mostSpent.managerId), n: h.mostSpent.amount },
     h.bestBargain && { title: "Best bargain", who: plr(h.bestBargain.playerId), n: h.bestBargain.price },
     h.biggestOverpay && { title: "Biggest overpay", who: plr(h.biggestOverpay.playerId), n: h.biggestOverpay.price },
   ].filter(Boolean) as { title: string; who: string; n: number }[];

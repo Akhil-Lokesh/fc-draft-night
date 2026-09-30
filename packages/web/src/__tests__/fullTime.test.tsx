@@ -20,6 +20,19 @@ function room(): any {
   };
 }
 
+test("a draft where nobody bought anyone shows no 'Most spent' award", () => {
+  render(<FullTime room={room()} myId="m_real" onExport={() => {}} />); // log is empty: no wins
+  expect(screen.queryByText(/most spent/i)).toBeNull();
+});
+
+test("once someone buys a player, 'Most spent' names them", () => {
+  const r = room();
+  r.log = [{ t: "win", at: 1, contestId: "c1", managerId: "m_bar", playerId: "mbappe", price: 210 }];
+  render(<FullTime room={r} myId="m_real" onExport={() => {}} />);
+  expect(screen.getByText(/most spent/i)).toBeTruthy();
+  expect(screen.getByText(/^Bar$/)).toBeTruthy();
+});
+
 test("defaults to the list view, showing each manager's squad as a strip", () => {
   render(<FullTime room={room()} myId="m_real" onExport={() => {}} />);
   expect(screen.getByText(/Mbappé/)).toBeTruthy();

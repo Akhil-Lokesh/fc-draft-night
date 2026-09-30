@@ -4,6 +4,9 @@
   margin: 0 auto;
   padding: calc(28px + env(safe-area-inset-top, 0px)) 18px calc(48px + env(safe-area-inset-bottom, 0px));
   max-width: 1080px;
+  /* Decorations (the hero's centre circle) may bleed past the edge; never let them make a phone
+   * scroll sideways. `clip` isn't a scroll container, so sticky children still stick. */
+  overflow-x: clip;
 }
 .page-narrow { max-width: 520px; }
 .page-wide { max-width: 1240px; }
@@ -211,6 +214,22 @@
 .waiting { text-align: center; padding: 30px 18px; border: 1px dashed var(--line-2); border-radius: var(--r-lg); display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .waiting p:first-of-type { font: 800 22px var(--display); text-transform: uppercase; }
 .kickoff { display: flex; flex-direction: column; gap: 10px; }
+/* Phones stack the lobby, which leaves Start under the pool builder. Pin it to the bottom of the
+ * screen instead, like the board's dock, and keep the page's end clear of it. */
+@media (max-width: 899px) {
+  .page-lobby:has(.kickoff) { padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+  .kickoff {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    gap: 6px;
+    padding: 10px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: rgba(6, 10, 7, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+    animation: none;
+  }
+  .kickoff .hint { text-align: center; }
+}
 
 /* pool builder catalog */
 .catalog { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; max-height: 360px; overflow-y: auto; }
@@ -261,6 +280,18 @@
   border: 1px solid color-mix(in srgb, var(--flare) 25%, transparent);
 }
 .award-who { font: 800 26px/1 var(--display); text-transform: uppercase; }
+/* Phones: each award becomes one compact row (title and name left, amount right), so the squads
+ * start on the first screen instead of after three full-width cards. */
+@media (max-width: 560px) {
+  .awards { gap: 6px; margin-bottom: 16px; }
+  .award {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title amt" "who amt";
+    align-items: center; gap: 2px 12px; padding: 10px 14px; border-radius: var(--r);
+  }
+  .award .kicker { grid-area: title; }
+  .award-who { grid-area: who; font-size: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .award .flap { grid-area: amt; }
+}
 .ft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 14px; }
 .ft-team { border-top: 3px solid var(--club); }
 .ft-team-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
