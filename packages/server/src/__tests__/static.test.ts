@@ -12,6 +12,7 @@ beforeAll(async () => {
   mkdirSync(join(root, "assets"), { recursive: true });
   writeFileSync(join(root, "index.html"), "<!doctype html>app");
   writeFileSync(join(root, "assets", "a.js"), "console.log(1)");
+  writeFileSync(join(root, "manifest.webmanifest"), "{}");
   writeFileSync(join(dir, "secret.sqlite"), "SECRET"); // next to dist, must never be served
   server = createServer(staticHandler(root));
   await new Promise<void>((r) => server.listen(0, r));
@@ -24,6 +25,12 @@ test("serves built files with the right type and caching", async () => {
   expect(js.headers.get("content-type")).toMatch(/javascript/);
   expect(js.headers.get("cache-control")).toMatch(/immutable/);
   expect((await fetch(`${url}/`)).headers.get("cache-control")).toBe("no-cache");
+});
+
+test("the install manifest is served as a web app manifest, so phones offer Add to Home Screen", async () => {
+  const res = await fetch(`${url}/manifest.webmanifest`);
+  expect(res.headers.get("content-type")).toBe("application/manifest+json");
+  expect(res.headers.get("cache-control")).toBe("no-cache"); // not fingerprinted, so never cached for good
 });
 
 test("unknown paths fall back to the app page (single-page app)", async () => {

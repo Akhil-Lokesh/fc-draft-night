@@ -353,6 +353,29 @@ select.input option { background: var(--sheet); }
 .toast span:first-child { flex: 1; }
 .toast-x { font-size: 20px; opacity: 0.7; }
 
+/* ── app feel on phones ───────────────────────────────────── */
+/* No pull-to-refresh mid-draft (it would reload the page and drop you out of a war). */
+body { overscroll-behavior-y: none; }
+/* Controls behave like native ones: no grey tap flash, no double-tap zoom delay, no text
+ * selection or iOS callout when a finger lingers on a button. */
+button, a, [role="tab"], .btn, .chip, .tab, .dock-btn, .club-card, .mk-row {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+@media (pointer: coarse) {
+  /* iOS zooms the whole page into any field whose text is under 16px. */
+  .input, select.input { font-size: 16px; }
+  /* Apple's minimum touch target is 44pt. */
+  .btn { min-height: 46px; }
+  .btn-sm { min-height: 44px; }
+  .btn-text { min-height: 44px; display: inline-flex; align-items: center; }
+  .tab { min-height: 42px; }
+  .chip { min-height: 38px; padding: 0 14px; }
+}
+
 /* ── motion ───────────────────────────────────────────────── */
 .rise { animation: rise 0.55s var(--ease) both; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }

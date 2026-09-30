@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { Manager, Player } from "@fcdn/shared";
-import { money, positionLabel } from "../lib/format.js";
+import { money } from "../lib/format.js";
 import { byValueDesc } from "../lib/board.js";
 import { clubLabel, useClubNames } from "../lib/clubs.js";
 import { ClubTag, Money, Pos } from "../ui/primitives.js";
@@ -81,7 +81,11 @@ export function Market({
           onClick={() => { setAmount(""); setOpenId(open ? null : p.id); }}
         >
           <span className="mk-name">{p.shirtNumber ? <i>{p.shirtNumber}</i> : null}{p.name}</span>
-          <Pos>{positionLabel(p)}</Pos>
+          {/* Alternates can be dropped on narrow phones (the scouting card still lists them) so the name keeps its room. */}
+          <Pos>
+            {p.positionDetail ?? p.position}
+            {p.positionDetail && p.altPositions?.length ? <span className="pos-alt"> · {p.altPositions.join("/")}</span> : null}
+          </Pos>
           {hot && <span className="mk-flag">on the block</span>}
           {p.lockedThisSeason && <span className="mk-flag mk-flag-lock">locked</span>}
           <Money n={p.listedValue} className="mk-val" />

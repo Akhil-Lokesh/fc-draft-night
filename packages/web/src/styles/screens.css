@@ -2,7 +2,11 @@
 .page {
   position: relative;
   margin: 0 auto;
-  padding: calc(28px + env(safe-area-inset-top, 0px)) 18px calc(48px + env(safe-area-inset-bottom, 0px));
+  padding:
+    calc(28px + env(safe-area-inset-top, 0px))
+    calc(18px + env(safe-area-inset-right, 0px))
+    calc(48px + env(safe-area-inset-bottom, 0px))
+    calc(18px + env(safe-area-inset-left, 0px));
   max-width: 1080px;
   /* Decorations (the hero's centre circle) may bleed past the edge; never let them make a phone
    * scroll sideways. `clip` isn't a scroll container, so sticky children still stick. */
@@ -43,6 +47,21 @@
 .hero-lede { max-width: 30ch; font-size: clamp(16px, 2.4vw, 20px); color: var(--chalk-2); line-height: 1.45; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .hero-actions .btn { flex: 1 1 220px; max-width: 280px; }
+/* Phones: the first screen is an app-style welcome — brand at the top, the two actions at the
+ * bottom within thumb reach — and everything shares one left and one right edge. */
+@media (max-width: 600px) {
+  .page-landing { padding-top: calc(28px + env(safe-area-inset-top, 0px)); }
+  .hero { min-height: calc(100svh - 28px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px); gap: 18px; }
+  /* auto margins above the kicker and above the actions centre the brand block in the space left over */
+  .hero-kicker { margin-top: auto; }
+  .hero-kicker span:not(.hero-kicker-dot) { display: block; }
+  .hero-kicker-dot { display: none; }
+  .hero-lede { max-width: none; }
+  .hero-actions { flex-direction: column; margin-top: auto; }
+  .hero-actions .btn { flex: none; width: 100%; max-width: none; }
+  .hero::after { right: auto; left: 34%; top: 50%; width: 92vw; transform: translateY(-78%); }
+  .numbers { margin-top: 28px; }
+}
 
 .numbers {
   display: grid;

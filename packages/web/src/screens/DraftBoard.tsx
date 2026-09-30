@@ -90,7 +90,9 @@ export function DraftBoard({
                 <button className="btn btn-ghost btn-sm" onClick={() => setConfirmEnd(false)}>Keep going</button>
               </>
             ) : (
-              <button className="btn btn-ghost btn-sm btn-danger" onClick={() => setConfirmEnd(true)}>End auction</button>
+              <button className="btn btn-ghost btn-sm btn-danger" aria-label="End auction" onClick={() => setConfirmEnd(true)}>
+                End<span className="bar-long"> auction</span>
+              </button>
             )}
           </div>
         )}

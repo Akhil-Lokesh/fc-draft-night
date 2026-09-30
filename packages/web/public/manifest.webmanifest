@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "FC Draft Night",
+  "short_name": "Draft Night",
+  "description": "Live transfer-market draft for 2 or more managers. One budget each, real squads: bid, challenge and poach your way to the best XI.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#060a07",
+  "theme_color": "#060a07",
+  "categories": ["games", "sports"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
