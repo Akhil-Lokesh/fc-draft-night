@@ -1,7 +1,7 @@
 import manifest from "./crests.json";
 
-/** Real club crests for the top FC26 clubs, fetched by scripts/fetch-crests.mjs into
- *  public/crests/. Any other club keeps the lettered shield. */
+/** Real club crests for the top 100 FC26 clubs (by squad value), fetched by
+ *  scripts/fetch-crests.mjs into public/crests/. Any other club keeps the lettered shield. */
 const FILES = manifest as Record<string, string>;
 
 // Keep in sync with crestKey in scripts/fetch-crests.mjs.

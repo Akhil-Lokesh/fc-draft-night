@@ -1,4 +1,4 @@
-// Fetch club crests for the top 50 FC26 clubs (ranked by total squad value in the catalog) from
+// Fetch club crests for the top N (default 100) FC26 clubs (ranked by total squad value in the catalog) from
 // TheSportsDB's free API, and save them inside the web app so they're served locally — no
 // hotlinking, and they still show on a LAN game night with no internet.
 //
@@ -6,14 +6,14 @@
 //   packages/web/public/crests/<slug>.png   — one 250px badge per club
 //   packages/web/src/lib/crests.json        — lookup: name key -> file slug (see crestKey)
 //
-// Clubs outside the top 50 keep the lettered shield. Crests are the clubs' trademarks; this is
+// Clubs outside the top N keep the lettered shield. Crests are the clubs' trademarks; this is
 // for a private game night, not redistribution.
 //
-// Usage: node scripts/fetch-crests.mjs [count=50]
+// Usage: node scripts/fetch-crests.mjs [count=100]
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const COUNT = Number(process.argv[2] ?? 50);
+const COUNT = Number(process.argv[2] ?? 100);
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const OUT_DIR = `${ROOT}packages/web/public/crests`;
 const MANIFEST = `${ROOT}packages/web/src/lib/crests.json`;
@@ -47,6 +47,13 @@ const SEARCH_AS = {
   "Tottenham Hotspur": ["Tottenham Hotspur"],
   "Newcastle United": ["Newcastle United"], // "Newcastle" finds Newcastle Jets
   "Manchester United": ["Manchester United"],
+  "RC Celta": ["Celta Vigo"], // "RC Celta" finds a different club (Gran Peña)
+  "Getafe CF": ["Getafe"],
+  "Al Ittihad": ["#136018"], // the Saudi club (Jeddah); a name search finds the Libyan Al-Ittihad first
+  "RCD Mallorca": ["Mallorca"],
+  "Beşiktaş JK": ["Besiktas"],
+  "Sporting Clube de Braga": ["Braga"],
+  "Club Brugge KV": ["Club Brugge"], // "Club Brugge KV" finds their reserve side, Club NXT
   "Nottingham Forest": ["#133720"], // name search finds nothing; TheSportsDB team id
   "RB Leipzig": ["RB Leipzig"],
   "Eintracht Frankfurt": ["Eintracht Frankfurt"],
@@ -116,7 +123,8 @@ async function main() {
       .map((n) => n.trim()).filter(Boolean);
     for (const n of names) for (const k of [slug(n), crestKey(n)]) claim(k, file);
     if (BUILTIN[club]) claim(BUILTIN[club], file);
-    console.log(`${i + 1}. ${club} -> ${team.strTeam} (${file}.png)`);
+    // The country makes a wrong-club match (same name, other league) easy to spot in the log.
+    console.log(`${i + 1}. ${club} -> ${team.strTeam} [${team.strCountry ?? "?"}] (${file}.png)`);
   }
 
   const sorted = Object.fromEntries(

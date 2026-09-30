@@ -7,7 +7,15 @@
 # FC26 catalog id instead (after "number", which you can then leave blank) — it's matched
 # exactly, skipping name-matching entirely. Get an id from the host's in-app pool search
 # (Setup → Build the pool), which shows it per result.
+#
+# Rules in short:
+#  - 2 to 10 teams. List every squad club once in ## TEAMS, spelled the same (required from season 2).
+#  - Each player appears exactly once in the whole file (one squad, or the pool — never both).
+#    The upload does NOT catch a repeat: the player quietly goes to whichever manager joins last.
+#  - Keep to plain commas, no quotation marks, no extra spaces. Lines starting with # are ignored.
+#  - A real squad is the full first team (about 22-30 players); the sample below is short on purpose.
 tournament,Friday Night League
+# season: 1 for a brand-new league. budgetStep: keep 0 unless you know you want a step.
 season,1
 budgetStep,0
 
@@ -24,6 +32,12 @@ Arsenal,
 # The "number" column is optional (shirt/squad number) — leave it blank if you don't know it.
 # Numbers can repeat, within a team or across teams. Optional 4th "id" column pins an exact
 # catalog match instead of matching by name — see the note up top.
+#
+# Only for a real player who is too new for FC26 to know: add a 5th "value" column (market value
+# in millions of euros, a number above 0) and a 6th "position" column (exactly GK, DEF, MID or FWD),
+# keeping the empty number and id cells so the columns line up. Example row (not active):
+#   Chelsea,J. Newplayer,,,12,MID
+# Players FC26 already knows must NOT carry value/position — the database's real stats always win.
 club,player,number
 Chelsea,C. Palmer,20
 Chelsea,M. Caicedo,25
@@ -36,7 +50,7 @@ Arsenal,M. Odegaard,8
 ## POOL
 # Optional. Extra players (any club, including teams not listed above) that go into the
 # free-agent pool from the start, up for grabs by any manager. Leave this section out
-# entirely if you don't want any. Numbers are optional here too.
+# entirely (header row included) if you don't want any. Numbers are optional here too.
 club,player,number
 Liverpool,F. Wirtz,7
 Liverpool,A. Isak,9
