@@ -10,7 +10,8 @@ export interface Transport {
 }
 
 export interface CreateOpts {
-  totalBudget: number;
+  /** Not sent by the app any more: the server fixes the budget. Kept optional for older callers. */
+  totalBudget?: number;
   quoteTimerMs?: number;
   squadSizeCap?: number | null;
   capacity?: number;

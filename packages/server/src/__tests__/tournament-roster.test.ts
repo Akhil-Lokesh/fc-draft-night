@@ -44,9 +44,21 @@ test("parses season 1: metadata, squads, and pool — no finishing order", () =>
   expect(r.finishingOrder).toEqual([]);
 });
 
-test("season 1 with a filled-in finishing position is rejected — nobody has a rank yet", () => {
-  const bad = season1Csv.replace("Chelsea,\n", "Chelsea,1\n");
-  expect(() => parseTournamentCsv(bad, catalog)).toThrow(/season 1/i);
+test("season 1 ignores the standings: a filled-in or even odd finishing position changes nothing", () => {
+  const filled = season1Csv.replace("Chelsea,\n", "Chelsea,1\n").replace("Atletico Madrid,\n", "Atletico Madrid,whatever\n");
+  const r = parseTournamentCsv(filled, catalog);
+  expect(r.finishingOrder).toEqual([]); // no places used, so budgets stay star-based
+  expect(r.seed).toHaveLength(4);
+});
+
+test("season 1 doesn't need a TEAMS section at all", () => {
+  const noTeams = season1Csv.replace(/## TEAMS[\s\S]*?(?=## SQUADS)/, "");
+  expect(parseTournamentCsv(noTeams, catalog).finishingOrder).toEqual([]);
+});
+
+test("season 2 still refuses a file with no standings", () => {
+  const csv = season1Csv.replace("season,1", "season,2");
+  expect(() => parseTournamentCsv(csv, catalog)).toThrow(/finishing position/i);
 });
 
 test("season 2 requires and parses finishing positions, worst-first", () => {
@@ -143,4 +155,34 @@ Atletico Madrid,J. Alvarez,,,,
   const youth = result.seed.find(p => p.name === "A Real Youth Player")!;
   expect(youth.value).toBe(1.2);
   expect(youth.position).toBe("MID");
+});
+
+test("season 2 reads each team's leftover money from the TEAMS section", () => {
+  const csv = season1Csv
+    .replace("season,1", "season,2")
+    .replace("club,finishingPosition", "club,finishingPosition,leftover")
+    .replace("Chelsea,\n", "Chelsea,2,35.5\n")
+    .replace("Atletico Madrid,\n", "Atletico Madrid,1,12\n");
+  const r = parseTournamentCsv(csv, catalog);
+  expect(r.leftovers).toEqual({ chelsea: 35.5, "atletico-madrid": 12 });
+});
+
+test("a team with no leftover given counts as 0 left", () => {
+  const csv = season1Csv
+    .replace("season,1", "season,2")
+    .replace("Chelsea,\n", "Chelsea,2\n")
+    .replace("Atletico Madrid,\n", "Atletico Madrid,1\n");
+  expect(parseTournamentCsv(csv, catalog).leftovers).toEqual({ chelsea: 0, "atletico-madrid": 0 });
+});
+
+test("a leftover that isn't a number, or is negative, is refused", () => {
+  const base = season1Csv.replace("season,1", "season,2").replace("club,finishingPosition", "club,finishingPosition,leftover")
+    .replace("Atletico Madrid,\n", "Atletico Madrid,1,5\n");
+  expect(() => parseTournamentCsv(base.replace("Chelsea,\n", "Chelsea,2,lots\n"), catalog)).toThrow(/leftover/i);
+  expect(() => parseTournamentCsv(base.replace("Chelsea,\n", "Chelsea,2,-4\n"), catalog)).toThrow(/leftover/i);
+});
+
+test("season 1 has no leftovers: that column is ignored like the standings", () => {
+  const csv = season1Csv.replace("club,finishingPosition", "club,finishingPosition,leftover").replace("Chelsea,\n", "Chelsea,,99\n");
+  expect(parseTournamentCsv(csv, catalog).leftovers).toEqual({});
 });

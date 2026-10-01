@@ -3,7 +3,7 @@ import { addPoolPlayer, applyCommand, cancelLeave, hostOf, requestLeave, resolve
 import type { RoomStore } from "./rooms.js";
 import type { Clock } from "./clock.js";
 import { Catalog } from "./catalog.js";
-import { exportSeasonCsv } from "./export.js";
+import { exportRosterCsv } from "./export.js";
 import { slugifyClub } from "./clubs.js";
 import { hashSeatKey, newSeatKey, publicState, seatFor } from "./seats.js";
 import { attachVoice, VoiceRooms } from "./voice.js";
@@ -20,7 +20,7 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
     // Host creates the room and gets back a shareable code, then joins as the first manager.
     // Kept separate from `join` so a room only ever comes into existence through this one path
     // (join throws "no such room" for an unknown code — it never auto-creates).
-    socket.on("create", async (p: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number; rosterCsv?: string; testMode?: boolean }) => {
+    socket.on("create", async (p: { totalBudget?: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number; rosterCsv?: string; testMode?: boolean }) => {
       try {
         const { code } = await store.create(p);
         // Only the creator learns this key; their join carrying it is what makes them host.
@@ -238,13 +238,13 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
       }
     });
 
-    // Season handoff: export the closed room's CSV (managers get a blank finishing-position
-    // column to fill in), then re-import that filled CSV to open season N+1.
+    // Season handoff: export the closed room as a roster file in exactly the upload format, for season N+1
+    // (the host fills in each team's finishing place; budgets come from those places), then upload it in Setup.
     socket.on("exportSeason", (p: { code: string }) => {
       if (!mine(p.code)) return;
       const s = store.get(p.code);
       if (!s) { socket.emit("error", "no such room"); return; }
-      const { csv, filename } = exportSeasonCsv(s);
+      const { csv, filename } = exportRosterCsv(s);
       socket.emit("seasonExport", { csv, filename });
     });
     socket.on("importSeason", async (p: { code: string; csv: string; base: number; step: number }) => {

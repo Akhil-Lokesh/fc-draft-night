@@ -72,25 +72,24 @@ export function Lobby({
             )}
         {declined && !asked && <p className="leave-no" role="status">The host asked you to stay.</p>}
         {myId && room.managers[myId] && <div className="lobby-voice"><VoiceControl code={room.code} myId={myId} /></div>}
-        <p className="kicker">The tunnel · Season {room.seasonNumber}</p>
         {room.testMode && <p className="test-chip" role="status">Test room</p>}
         <Brand size="md" />
       </header>
 
       <div className="lobby-grid">
         <div className="lobby-main">
-          <section className="ticket rise" aria-label="Room code">
-            <div className="ticket-left">
+          <section className="room-card rise" aria-label="Room code">
+            <div className="room-code">
               <span className="label">Room code</span>
               <Flap size="xl">{room.code}</Flap>
-              <button className="btn btn-text" onClick={share}>{copied ? "Link copied ✓" : "Copy invite link"}</button>
+              <button className="btn btn-chalk btn-sm" onClick={share}>{copied ? "Link copied ✓" : "Copy invite link"}</button>
             </div>
-            <dl className="ticket-terms">
-              <div><dt>Budget</dt><dd><Money n={room.totalBudget} /></dd></div>
-              <div><dt>Quote timer</dt><dd>{Math.round(room.quoteTimerMs / 60000)} min</dd></div>
-              <div><dt>Squad cap</dt><dd>{room.squadSizeCap ?? "None"}</dd></div>
-              <div><dt>Pool</dt><dd>{poolCount}</dd></div>
-            </dl>
+            <ul className="room-stats">
+              <li><span>Budget</span><b><Money n={room.totalBudget} /></b></li>
+              <li><span>Quote timer</span><b>{Math.round(room.quoteTimerMs / 60000)} min</b></li>
+              {room.squadSizeCap != null && <li><span>Squad cap</span><b>{room.squadSizeCap}</b></li>}
+              <li><span>Pool</span><b>{poolCount}</b></li>
+            </ul>
           </section>
 
           <Section title="Managers" aside={<span className="count">{managers.length}/{room.capacity}</span>} className="rise">

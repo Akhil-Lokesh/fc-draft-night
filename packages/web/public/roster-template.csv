@@ -20,6 +20,17 @@
 #            This finds a player whose name you typed differently (a first name only, a nickname).
 #   Nobody found: the player is added as a cheap unknown (see below).
 #
+# BUDGETS are not in this file, and nobody types one in Host Setup:
+#   Season 1: a 5-star club starts with 1500M (both the floor and the ceiling); each half-star lower gets 150M less.
+#   Season 2 and later: a club starts with the money it had LEFT at the end of last season (the `leftover` column)
+#   plus 20M for every league place it finished above last. With 5 teams: 5th place +0, 4th +20, 3rd +40,
+#   2nd +60, 1st +80. So the standings (finishingPosition) and the leftover are all the file needs.
+#
+# NEXT SEASON: the "Export season CSV" button at full time gives you this exact format for the next season: season number
+# already raised, each club's squad as it ended, and each team's leftover already filled in. All you add is the
+# standings: finishingPosition for every team in ## TEAMS (last season's league place, 1 = champion, each number
+# once). Then upload the file in Host Setup. Nothing else needs to change.
+#
 # Rules in short:
 #  - 2 to 10 teams. List every squad club once in ## TEAMS, spelled the same (required from season 2).
 #  - Each player appears exactly once in the whole file (one squad, or the pool — never both).
@@ -27,17 +38,21 @@
 #  - Keep to plain commas, no quotation marks, no extra spaces. Lines starting with # are ignored.
 #  - A real squad is the full first team (about 22-30 players); the sample below is short on purpose.
 tournament,Friday Night League
-# season: 1 for a brand-new league. budgetStep: keep 0 unless you know you want a step.
+# season: 1 for a brand-new league, then 2, 3 ... (there is no budgetStep line any more).
 season,1
-budgetStep,0
 
 ## TEAMS
-# One row per team. Leave finishingPosition BLANK for season 1 — nobody has a rank yet.
-# From season 2 onward, every team needs a unique finishingPosition (1 = champion).
-club,finishingPosition
-Chelsea,
-Atletico Madrid,
-Arsenal,
+# One row per team. finishingPosition is the STANDINGS: where the team finished last season (1 = champion).
+#   Season 1: standings are not used. Leave finishingPosition blank; anything written there is ignored.
+#   Season 2 and later: add the standings. Every team needs its own whole number (no repeats); that place adds 20M per
+#   place above last to the team's budget. Change `season,1` above to the new season number as well.
+# leftover is the money (in millions) the team had left at the end of last season. The export fills it in for you.
+#   Season 1 ignores it. From season 2, leave it empty and the team counts as 0 left.
+# Example for season 2:   Chelsea,2,35.5   Atletico Madrid,1,12   Arsenal,3,0
+club,finishingPosition,leftover
+Chelsea,,
+Atletico Madrid,,
+Arsenal,,
 
 ## SQUADS
 # One row per player. Each player belongs to exactly one of the teams listed above.

@@ -84,3 +84,8 @@ test("each club in the picker shows its team colour — its slot in the room's c
   const cards = [...document.querySelectorAll<HTMLElement>(".club-card")];
   expect(cards.map((c) => c.style.getPropertyValue("--club"))).toEqual(TEAM_PALETTE.slice(0, 3).map((c) => c.color));
 });
+
+test("the page has no 'Join the draft' label above the logo", () => {
+  render(<Join join={() => {}} takenClubs={[]} clubs={FIVE} />);
+  expect(screen.queryByText(/join the draft/i)).toBeNull();
+});

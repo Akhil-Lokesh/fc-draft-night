@@ -1,5 +1,5 @@
 import { test, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Lobby } from "../screens/Lobby.js";
 
@@ -98,4 +98,31 @@ test("the guest is told when the host keeps them in", () => {
   const { rerender } = render(<Lobby room={{ ...room, leaveRequests: ["m_arsenal"] }} {...props} />);
   rerender(<Lobby room={{ ...room, leaveRequests: [] }} {...props} />);
   expect(screen.getByText(/host asked you to stay/i)).toBeTruthy();
+});
+
+test("the lobby has no 'The tunnel · Season' label above the logo", () => {
+  render(<Lobby room={room} myId="m_arsenal" iAmHost={false} onStart={() => {}} />);
+  expect(screen.queryByText(/the tunnel/i)).toBeNull();
+  expect(screen.queryByText(/season 1/i)).toBeNull();
+});
+
+test("the room card shows the code, an invite-link button and the room's terms as tiles", () => {
+  render(<Lobby room={room} myId="m_arsenal" iAmHost={false} onStart={() => {}} />);
+  const card = screen.getByRole("region", { name: /room code/i });
+  expect(card).toHaveTextContent("R0002");
+  expect(within(card).getByRole("button", { name: /copy invite link/i })).toBeTruthy();
+  const tiles = within(card).getAllByRole("listitem").map((li) => li.textContent);
+  expect(tiles).toEqual(["Budget1500M", "Quote timer3 min", "Pool1"]); // no squad cap tile when there is none
+});
+
+test("a squad cap tile appears only when the room has one", () => {
+  render(<Lobby room={{ ...room, squadSizeCap: 25 }} myId="m_arsenal" iAmHost={false} onStart={() => {}} />);
+  const card = screen.getByRole("region", { name: /room code/i });
+  expect(within(card).getAllByRole("listitem").map((li) => li.textContent)).toContain("Squad cap25");
+});
+
+test("the room card is a dark card like the rest of the page, not a coloured ticket", () => {
+  const { container } = render(<Lobby room={room} myId="m_arsenal" iAmHost={false} onStart={() => {}} />);
+  expect(container.querySelector(".ticket")).toBeNull();
+  expect(container.querySelector(".room-card")).toBeTruthy();
 });

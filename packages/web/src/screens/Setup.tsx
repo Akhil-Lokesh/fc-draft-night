@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { MAX_MANAGERS } from "@fcdn/shared";
+import { FIVE_STAR_BUDGET, STANDING_BONUS, MAX_MANAGERS } from "@fcdn/shared";
 import { Brand } from "../ui/primitives.js";
+import { isLocalHost } from "../lib/env.js";
 
 export interface StartConfig {
-  totalBudget: number;
   quoteTimerMs: number;
   squadSizeCap: number | null;
   capacity?: number;
@@ -31,28 +31,23 @@ export function countClubs(csv: string): number {
 
 const TIMER_OPTIONS = [1, 2, 3, 5];
 
-/** Tolerate a stray "€", "M" or spaces next to the number. */
-const parseAmount = (raw: string): number => Number(raw.replace(/[^\d.]/g, ""));
-
 export function Setup({
-  floor,
   onStart,
   startLabel = "Start draft",
   onBack,
+  allowTestRoom = isLocalHost(window.location.hostname),
 }: {
-  floor: number;
   onStart: (cfg: StartConfig) => void;
+  /** The solo test room is a local development tool: offered only on localhost, never on the public site. */
+  allowTestRoom?: boolean;
   startLabel?: string;
   onBack?: () => void;
 }) {
-  const [budget, setBudget] = useState(String(floor));
   const [timerMin, setTimerMin] = useState(5);
-  const [cap, setCap] = useState("");
   const [rosterCsv, setRosterCsv] = useState<string | null>(null);
   const [rosterName, setRosterName] = useState<string | null>(null);
   const [capacity, setCapacity] = useState(2);
   const [testRoom, setTestRoom] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // There are no built-in teams: every club comes from the roster. One colour per manager, so never
   // more than MAX_MANAGERS however many clubs it names.
@@ -73,19 +68,12 @@ export function Setup({
 
   const start = () => {
     if (!rosterCsv) return; // the button is disabled too; a room has no teams without a roster
-    const total = parseAmount(budget);
-    if (!Number.isFinite(total) || total < floor) {
-      setError(`Budget is below the floor (€${floor}M): a 5-star club needs at least that.`);
-      return;
-    }
-    setError(null);
     onStart({
-      totalBudget: total,
       quoteTimerMs: timerMin * 60_000,
-      squadSizeCap: cap.trim() ? parseAmount(cap) : null,
+      squadSizeCap: null,
       capacity,
       rosterCsv,
-      testMode: testRoom || undefined,
+      testMode: (allowTestRoom && testRoom) || undefined,
     });
   };
 
@@ -93,7 +81,6 @@ export function Setup({
     <div className="page page-narrow">
       <header className="page-head rise">
         {onBack && <button className="btn btn-text" onClick={onBack}>← Back</button>}
-        <p className="kicker">Host setup</p>
         <Brand size="md" />
       </header>
 
@@ -102,29 +89,18 @@ export function Setup({
         style={{ animationDelay: "60ms" }}
         onSubmit={(e) => { e.preventDefault(); start(); }}
       >
-        <fieldset className="group">
-          <legend className="group-legend"><span>01</span> Money</legend>
-          <div className="field">
-            <label className="label" htmlFor="setup-budget">Total budget for a 5-star club (€M)</label>
-            <div className="input-money">
-              <span aria-hidden="true">€</span>
-              <input id="setup-budget" type="text" inputMode="decimal" className="input input-xl"
-                value={budget} onChange={(e) => setBudget(e.target.value)} />
-              <span aria-hidden="true">M</span>
-            </div>
-            <p className="hint">
-              Minimum €{floor}M. Each half-star lower gets €150M less. A squad worth more than its club's budget starts
-              over budget, and that manager must release players before the auction can end.
-            </p>
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="setup-cap">Squad cap (optional)</label>
-            <input id="setup-cap" type="number" className="input" placeholder="No cap" value={cap} onChange={(e) => setCap(e.target.value)} />
-          </div>
-        </fieldset>
+        <aside className="budget-note" role="note" aria-label="Budgets">
+          <span className="budget-note-tag">Budgets</span>
+          <p>
+            <b>€{FIVE_STAR_BUDGET}M</b> for a 5-star club, <b>€150M</b> less for every half star below.
+          </p>
+          <p>
+            From season 2: your leftover money from last season plus <b>€{STANDING_BONUS}M</b> for every league place above last.
+          </p>
+        </aside>
 
         <fieldset className="group">
-          <legend className="group-legend"><span>02</span> Clubs</legend>
+          <legend className="group-legend"><span>01</span> Roster</legend>
           <div className="field">
             <label className="label" htmlFor="setup-roster">Upload your roster</label>
             <label className={`drop ${rosterName ? "is-loaded" : ""}`}>
@@ -151,7 +127,7 @@ export function Setup({
         </fieldset>
 
         <fieldset className="group">
-          <legend className="group-legend"><span>03</span> Clock</legend>
+          <legend className="group-legend"><span>02</span> Clock</legend>
           <div className="field">
             <span className="label" id="timer-label">Quote timer</span>
             <div className="segmented" role="radiogroup" aria-labelledby="timer-label">
@@ -166,23 +142,42 @@ export function Setup({
           </div>
         </fieldset>
 
-        <fieldset className="group">
-          <legend className="group-legend"><span>04</span> Testing</legend>
-          <label className="check">
-            <input type="checkbox" checked={testRoom} onChange={(e) => setTestRoom(e.target.checked)} />
-            <span>
-              <b>Test room</b>
-              <span className="hint">Start alone and play every seat yourself. Empty seats become practice managers you can switch between during the draft.</span>
-            </span>
-          </label>
-        </fieldset>
+        {allowTestRoom && (
+          <fieldset className="group">
+            <legend className="group-legend"><span>03</span> Testing</legend>
+            <label className="check">
+              <input type="checkbox" checked={testRoom} onChange={(e) => setTestRoom(e.target.checked)} />
+              <span>
+                <b>Test room</b>
+                <span className="hint">Start alone and play every seat yourself. Empty seats become practice managers you can switch between during the draft.</span>
+              </span>
+            </label>
+          </fieldset>
+        )}
 
-        {error && <div className="inline-error" role="alert">{error}</div>}
-
-        {!rosterCsv && <p className="hint center">Upload a roster to create a room: every team and player comes from your file.</p>}
-        <p className="hint center">Next you get a room code to share, then pick your own name and club.</p>
         <button type="submit" className="btn btn-flare btn-lg btn-block" disabled={!rosterCsv}>{startLabel}</button>
       </form>
+
+      <section className="howto rise" style={{ animationDelay: "120ms" }} aria-labelledby="howto-title">
+        <h2 id="howto-title" className="howto-title">How it works</h2>
+        <ol className="howto-list">
+          <li>
+            <b>Prepare your roster.</b> Download the roster template (link in the Roster box above) and list every club's squad. Names are checked against the FC26 database.
+          </li>
+          <li>
+            <b>Upload your roster file.</b> Choose the CSV above, set how many managers play and the quote timer.
+          </li>
+          <li>
+            <b>Create the room.</b> You get a room code and an invite link. Send it to your managers.
+          </li>
+          <li>
+            <b>Everyone joins.</b> Each manager enters the code, picks a name and a club. Press Start when the room is full.
+          </li>
+          <li>
+            <b>Draft.</b> Claim free agents, challenge rivals' players and defend your own until the clock runs out. The auction ends once everyone is at zero or better.
+          </li>
+        </ol>
+      </section>
     </div>
   );
 }

@@ -80,6 +80,8 @@ export interface RoomState {
    *  A club absent here just uses `totalBudget`, same as before this existed. */
   clubBudgets: Record<string, number>;
   seasonNumber: number;
+  /** The league's name from a tournament roster CSV (`tournament,<name>`), shown on the full-time screen. */
+  tournamentName?: string;
   /** A solo-testing room: the host may start without a full room (empty seats become practice
    *  managers) and may act as any seat. Set only when the room is created; ordinary rooms never have it. */
   testMode?: boolean;
@@ -110,7 +112,7 @@ export const LISTING_MS = 120_000;         // 2-minute listing window
 export function createRoom(opts: {
   code: string; totalBudget: number; seed: SeedPlayer[];
   quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number;
-  seasonNumber?: number; clubBudgets?: Record<string, number>; testMode?: boolean;
+  seasonNumber?: number; clubBudgets?: Record<string, number>; testMode?: boolean; tournamentName?: string | null;
 }): RoomState {
   const players: Record<string, Player> = {};
   const clubNames: Record<string, string> = {};
@@ -133,6 +135,7 @@ export function createRoom(opts: {
     clubBudgets: opts.clubBudgets ?? {},
     seasonNumber: opts.seasonNumber ?? 1, status: "setup", startedAt: null,
     ...(opts.testMode ? { testMode: true } : {}),
+    ...(opts.tournamentName ? { tournamentName: opts.tournamentName } : {}),
     managers: {}, players, contests: {}, challenges: {}, log: [], seq: 0,
   };
 }

@@ -14,7 +14,6 @@ import { VoiceClient, VoiceContext } from "./lib/voice.js";
 
 // Lowest budget the host can type. (It used to be derived from the built-in squads, which no longer exist;
 // the server still checks every club's own squad value against its own budget.)
-const FLOOR = 1500;
 // Same origin by default: the dev server proxies /socket.io to the game server (vite.config.ts), so
 // the app works through one https link — required for the mic on phones and for remote friends.
 const SERVER_URL = (import.meta as any).env?.VITE_SERVER_URL ?? location.origin;
@@ -187,7 +186,6 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
   } else if (mode === "host-config") {
     screen = (
       <Setup
-        floor={FLOOR}
         startLabel="Create room"
         onBack={goHome}
         onStart={(cfg) => { setIAmHost(true); store.getState().create(cfg); }}

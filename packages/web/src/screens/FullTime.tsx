@@ -36,7 +36,11 @@ export function FullTime({
       <header className="ft-head rise">
         <div className="hero-brand">
           <Brand size="xl" />
-          <p className="hero-tag"><span>Full time</span><i aria-hidden="true" /><span>Season {room.seasonNumber}</span></p>
+          <p className="hero-tag">
+            <span>Full time</span>
+            {room.tournamentName && <><i aria-hidden="true" /><span>{room.tournamentName}</span></>}
+            <i aria-hidden="true" /><span>Season {room.seasonNumber}</span>
+          </p>
         </div>
         <div className="ft-actions">
           <button className="btn btn-chalk" onClick={onExport}>Export season CSV</button>

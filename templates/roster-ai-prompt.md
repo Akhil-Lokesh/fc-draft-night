@@ -22,10 +22,11 @@ The file has three top lines, then up to three sections. Each section starts wit
 |---|---|---|---|---|
 | Top lines | `tournament,<name>` | Optional | The league's name | Any text; avoid commas and quotes |
 | Top lines | `season,<number>` | Required | `1` for a brand-new league, `2`, `3`… for later seasons | Whole number, 1 or more |
-| Top lines | `budgetStep,<number>` | Optional (default 0) | The budget gap between finishing positions, used from season 2 onward | A number. Use `0` unless I say otherwise |
-| `## TEAMS` | header row | Always include | Exactly `club,finishingPosition` | Copy it exactly |
+| Whole file | budget | Never in the file | There is no budget column and nobody types one | Season 1: a 5-star club starts with 1500M (floor and ceiling), each half-star lower gets 150M less. Season 2+: a club starts with its `leftover` (money left at the end of last season) plus 20M for every league place above last (5 teams: 5th +0, 4th +20, 3rd +40, 2nd +60, 1st +80), so the standings and the leftover ARE the budget |
+| `## TEAMS` | header row | Always include | Exactly `club,finishingPosition,leftover` | Copy it exactly |
 | `## TEAMS` | `club` | Required | One row per team, named as FC 26 names the club | 2 to 10 teams. Each club once. Same spelling as in SQUADS. Accents and capitals are ignored |
-| `## TEAMS` | `finishingPosition` | Season 1: leave empty. Season 2+: required | Last season's league position for that team | Season 1: EMPTY for every team (keep the comma). Season 2+: a different whole number for every team, 1 = champion |
+| `## TEAMS` | `finishingPosition` (the standings) | Season 1: not used. Season 2+: required | Last season's league position for that team | Season 1: leave EMPTY for every team (keep the comma); anything written there is ignored. Season 2+: a different whole number for every team, 1 = champion; each place above last adds 20M to the team's budget |
+| `## TEAMS` | `leftover` | Season 1: not used. Season 2+: recommended | The money, in millions, the team had left at the end of last season | A number, 0 or more. Empty counts as 0. Season 1 ignores it. Never guess one: the app's end-of-season export fills it in |
 | `## SQUADS` | header row | Required | Exactly `club,player,number,id,score` | Columns are read by their header names: copy it exactly and keep every row's cells in the same order |
 | `## SQUADS` | `club` (1st column) | Required | The team that owns this player | Must be one of the teams in TEAMS |
 | `## SQUADS` | `player` (2nd) | Required | The player's name as EA Sports FC 26 shows it | First initial + surname (`C. Palmer`), or the single name the game uses (`Pedri`, `Rodri`, `Vini Jr.`) |
@@ -41,7 +42,7 @@ The file has three top lines, then up to three sections. Each section starts wit
 
 | Part | Correct | Wrong | What the app does with the wrong one |
 |---|---|---|---|
-| Season 1 team | `Chelsea,` | `Chelsea,1` | Rejects the file: season 1 can't have finishing positions |
+| Season 1 team | `Chelsea,` | `Chelsea,1` | Nothing breaks: season 1 ignores the standings, so the `1` is simply not used. Leave it empty anyway |
 | Season 2 teams | `Chelsea,1` `Arsenal,2` `Atletico Madrid,3` | `Chelsea,1` `Arsenal,1` … or a team with no number | Rejects the file: duplicate or missing finishing position |
 | Squad row | `Chelsea,C. Palmer,20,257534,87` | `Chelsea,C. Palmer,twenty,257534,87` | Rejects the file: bad shirt number |
 | Unknown shirt number | `Chelsea,C. Palmer,,257534,87` | `Chelsea,C. Palmer,0,257534,87` | Rejects the file: bad shirt number (0 is not allowed; leave it empty) |
@@ -64,13 +65,12 @@ The structure to copy. In a real file each squad is the full first team, roughly
 ```csv
 tournament,Friday Night League
 season,1
-budgetStep,0
 
 ## TEAMS
-club,finishingPosition
-Chelsea,
-Atletico Madrid,
-Arsenal,
+club,finishingPosition,leftover
+Chelsea,,
+Atletico Madrid,,
+Arsenal,,
 
 ## SQUADS
 club,player,number,id,score
@@ -90,25 +90,28 @@ Liverpool,A. Isak,9,233731,88
 
 The ids and scores above are the real FC 26 ones. **In your file, only write an id or a score you actually know; leave the cell empty otherwise.** An empty `id` and `score` is always fine (`Chelsea,C. Palmer,20,,`).
 
-For season 2 the TEAMS section changes to unique positions and the top lines change; everything else stays the same:
+For season 2 the TEAMS section gets the standings (unique positions) and each team's leftover, and the season number goes up; everything else stays the same:
 
 ```csv
 tournament,Friday Night League
 season,2
-budgetStep,0
 
 ## TEAMS
-club,finishingPosition
-Chelsea,1
-Atletico Madrid,3
-Arsenal,2
+club,finishingPosition,leftover
+Chelsea,1,35.5
+Atletico Madrid,3,0
+Arsenal,2,12
 ```
+
+With these, next season's starting money is Chelsea 35.5 + 40 = 75.5M (1st of 3, two places above last), Arsenal 12 + 20 = 32M, Atletico Madrid 0M (last place gets no bonus).
+
+The app's end-of-season export is a file in exactly this format for the next season (season number already raised, squads as they ended, each team's `leftover` already filled in). Only `finishingPosition` (the standings) in `## TEAMS` is left blank for the host to fill in.
 
 ## BEFORE YOU ANSWER — CHECK
 
 - [ ] Starts with the three top lines, then `## TEAMS`, then `## SQUADS`.
 - [ ] 2 to 10 teams; every club in SQUADS is in TEAMS with identical spelling.
-- [ ] Season 1: finishingPosition empty for all. Season 2+: unique whole numbers for all.
+- [ ] Season 1: no standings; finishingPosition empty for all (it would be ignored anyway). Season 2+: standings added, unique whole numbers for all.
 - [ ] **No player appears twice anywhere in the file** (search each name).
 - [ ] Every name is spelled the way FC 26 spells it; empty shirt number, id and score wherever you are unsure (never guess).
 - [ ] Every SQUADS and POOL row has the same number of cells as its header.

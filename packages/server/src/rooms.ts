@@ -1,19 +1,20 @@
 import { randomBytes } from "node:crypto";
 import {
-  createRoom, addManager, addPoolPlayer, positionStepBudgets, startNextSeason, MAX_MANAGERS,
+  createRoom, addManager, addPoolPlayer, startNextSeason, squadValue, MAX_MANAGERS, FIVE_STAR_BUDGET, STANDING_BONUS,
   type RoomState, type SeedPlayer, type ClubId,
 } from "@fcdn/shared";
 import type { Queue } from "./queue.js";
 import type { Db } from "./db.js";
-import { parseFinishingOrder } from "./import.js";
+import { parseFinishingOrder, parseTeamsFinishingOrder } from "./import.js";
+import { slugifyClub, normalizeForMatch } from "./clubs.js";
 import { parseRosterCsv, parseTournamentCsv, type TournamentRoster } from "./roster.js";
 import { starsFor, budgetForStars } from "./clubStars.js";
 
 const isTournamentCsv = (csv: string): boolean => /^##\s*SQUADS/im.test(csv);
 
-/** Lowest 5-star budget a host may set: every 0.5 stars down is 150M less, so this keeps even a
- *  half-star club at 150M or more. */
-export const MIN_FIVE_STAR_BUDGET = 1500;
+/** The lowest 5-star budget a room may be created with: every 0.5 stars down is 150M less, so this keeps even a
+ *  half-star club at 150M or more. Nobody types a budget any more; a room always gets FIVE_STAR_BUDGET. */
+export const MIN_FIVE_STAR_BUDGET = FIVE_STAR_BUDGET;
 
 /** Every club's budget comes from its real-world FC26 star rating (see clubStars.ts) whenever
  *  a roster is uploaded, scaled from the budget the host typed: that is what a 5-star club gets and
@@ -65,7 +66,7 @@ export class RoomStore {
     return Math.min(MAX_MANAGERS, new Set(seed.map(p => p.clubId).filter((c): c is ClubId => c != null)).size);
   }
 
-  async create(opts: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number; rosterCsv?: string; testMode?: boolean }): Promise<{ code: string }> {
+  async create(opts: { totalBudget?: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number; rosterCsv?: string; testMode?: boolean }): Promise<{ code: string }> {
     // An uploaded roster replaces the built-in 5-club seed entirely, so a room can be any real
     // club(s) in the FC26 database — every player in it has already been cross-checked.
     // No built-in teams: a room's clubs come only from the roster the host uploads.
@@ -83,9 +84,10 @@ export class RoomStore {
       }
     }
 
-    // Budgets come from star ratings unless this is a season-2+ tournament roster, where the typed number
-    // is the worst finisher's base instead. The 1500M minimum only makes sense for the star-based ones.
-    if (!tournament?.finishingOrder.length && !(opts.totalBudget >= MIN_FIVE_STAR_BUDGET)) {
+    // Season 1 budgets come from star ratings, scaled from the fixed 5-star budget. From season 2 they come from
+    // the standings and the money each club had left (below).
+    const totalBudget = opts.totalBudget ?? FIVE_STAR_BUDGET;
+    if (!tournament?.finishingOrder.length && !(totalBudget >= MIN_FIVE_STAR_BUDGET)) {
       throw new Error(`budget too low: a 5-star club needs at least ${MIN_FIVE_STAR_BUDGET}M`);
     }
 
@@ -94,21 +96,23 @@ export class RoomStore {
       throw new Error(`capacity must be between 2 and ${max}`);
     }
 
-    // A prior season's finishing position can give each club a different starting budget
-    // (positionStepBudgets, worst-to-best) — so the floor check must be per-club here, not one
-    // flat number: every club's OWN budget must cover its OWN squad's value.
-    const clubBudgets = tournament?.finishingOrder.length
-      ? positionStepBudgets(tournament.finishingOrder, opts.totalBudget, tournament.budgetStep)
+    // Season 2+: a club's budget is its squad's value plus the money it had left last season plus STANDING_BONUS
+    // for every league place it finished above last, so its spendable money at the start is exactly
+    // leftover + bonus (worst-first order: index 0 is last place and gets no bonus).
+    const clubBudgets: Record<string, number> = tournament?.finishingOrder.length
+      ? Object.fromEntries(tournament.finishingOrder.map((clubId, i) =>
+          [clubId, squadValue(seed, clubId) + (tournament!.leftovers[clubId] ?? 0) + STANDING_BONUS * i]))
       : opts.rosterCsv
-        ? budgetsFromRoster(seed, opts.totalBudget)
+        ? budgetsFromRoster(seed, totalBudget)
         : {};
     // A squad worth more than its club's budget is fine: that manager starts in the red and has to release
     // players (their choice) before the auction can end. See managersOverBudget in @fcdn/shared.
 
     const code = this.gen();
     let s = createRoom({
-      code, totalBudget: opts.totalBudget, seed, quoteTimerMs: opts.quoteTimerMs, squadSizeCap: opts.squadSizeCap,
+      code, totalBudget, seed, quoteTimerMs: opts.quoteTimerMs, squadSizeCap: opts.squadSizeCap,
       capacity: opts.capacity ?? max, seasonNumber: tournament?.seasonNumber, clubBudgets, testMode: opts.testMode === true,
+      tournamentName: tournament?.tournamentName,
     });
     for (const p of poolSeed) s = addPoolPlayer(s, p);
     this.q.setState(code, s);
@@ -137,8 +141,15 @@ export class RoomStore {
   }
 
   async applyHandoff(code: string, csv: string, opts: { base: number; step: number }): Promise<RoomState> {
-    const finishingOrder = parseFinishingOrder(csv);
-    const { state } = await this.q.run(code, (s) => ({ state: startNextSeason(s, { finishingOrder, ...opts }), events: [] }));
+    const { state } = await this.q.run(code, (s) => {
+      if (!s) throw new Error("no such room");
+      // The season export is a roster file (## TEAMS with a place per club); older exports had a managers table.
+      const finishingOrder = /^##\s*TEAMS/im.test(csv)
+        ? parseTeamsFinishingOrder(csv, (club) => Object.values(s.managers).find(m =>
+            normalizeForMatch(s.clubNames[m.clubId] ?? m.clubId) === normalizeForMatch(club) || m.clubId === slugifyClub(club))?.id)
+        : parseFinishingOrder(csv);
+      return { state: startNextSeason(s, { finishingOrder, ...opts }), events: [] };
+    });
     this.db.save(state);
     return state;
   }

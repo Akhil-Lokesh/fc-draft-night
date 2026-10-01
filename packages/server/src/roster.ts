@@ -295,8 +295,10 @@ export interface TournamentRoster {
   seed: SeedPlayer[];
   poolSeed: SeedPlayer[];
   /** ClubIds in finishing order, worst-first (same convention as `positionStepBudgets`).
-   *  Empty for season 1, where nobody has a rank yet. */
+   *  Empty for season 1, where nobody has a rank yet (any standings in the file are ignored). */
   finishingOrder: string[];
+  /** clubId -> money the club had left at the end of the previous season (season 2+; 0 when not given). */
+  leftovers: Record<string, number>;
 }
 
 /** Splits a tournament CSV into its meta lines (before any section) and named `## SECTION`
@@ -327,7 +329,7 @@ function parseClubPlayerSection(lines: string[], index: CatalogIndex, sectionNam
 /**
  * Parses the richer tournament CSV format: `key,value` metadata (tournament name, season
  * number, per-position budget step), a `## TEAMS` section carrying each club's finishing
- * position from the prior season (required from season 2 onward, forbidden in season 1 —
+ * position from the prior season (required from season 2 onward; ignored in season 1 —
  * nobody has a rank yet), a `## SQUADS` section (every manager's starting roster), and an
  * optional `## POOL` section (extra free-agent players available from the start).
  */
@@ -366,24 +368,27 @@ export function parseTournamentCsv(csv: string, catalog: SeedPlayer[]): Tourname
   const squadClubIds = new Set(seed.map(p => p.clubId!));
   if (squadClubIds.size < 2) throw new Error("roster must name at least 2 clubs");
 
-  const teamLines = sections["TEAMS"] ?? [];
+  // Standings only count from season 2 (they set each club's budget). In season 1 the whole TEAMS section,
+  // finishing positions included, is not looked at: nobody has a rank yet, so anything written there is ignored.
+  const teamLines = seasonNumber === 1 ? [] : (sections["TEAMS"] ?? []);
   const teamHeader = teamLines[0];
   const positions = new Map<string, string>(); // clubId -> raw finishingPosition text
+  const leftoverRaw = new Map<string, string>(); // clubId -> raw leftover text
   if (teamLines.length) {
     if (!teamHeader || !/^club\s*,\s*finishingposition/i.test(teamHeader.replace(/\s+/g, ""))) {
       throw new Error('"## TEAMS" section must start with a "club,finishingPosition" header');
     }
     for (let i = 1; i < teamLines.length; i++) {
-      const [clubRaw, posRaw] = parseCsvLine(teamLines[i]!);
+      const [clubRaw, posRaw, leftRaw] = parseCsvLine(teamLines[i]!);
       if (!clubRaw) continue;
       positions.set(slugifyClub(clubRaw), (posRaw ?? "").trim());
+      leftoverRaw.set(slugifyClub(clubRaw), (leftRaw ?? "").trim());
     }
   }
 
   let finishingOrder: string[] = [];
-  if (seasonNumber === 1) {
-    if ([...positions.values()].some(v => v)) throw new Error("season 1 can't have finishing positions — nobody has a rank yet");
-  } else {
+  const leftovers: Record<string, number> = {};
+  if (seasonNumber !== 1) {
     const entries: { clubId: string; pos: number }[] = [];
     for (const clubId of squadClubIds) {
       const raw = positions.get(clubId);
@@ -394,7 +399,14 @@ export function parseTournamentCsv(csv: string, catalog: SeedPlayer[]): Tourname
     }
     if (new Set(entries.map(e => e.pos)).size !== entries.length) throw new Error("duplicate finishing position in TEAMS section");
     finishingOrder = entries.sort((a, b) => b.pos - a.pos).map(e => e.clubId); // worst (highest number) first
+    // Money each club had left last season (the `leftover` column): carried into the new season's budget.
+    for (const clubId of squadClubIds) {
+      const raw = leftoverRaw.get(clubId) ?? "";
+      const n = raw === "" ? 0 : Number(raw);
+      if (!Number.isFinite(n) || n < 0) throw new Error(`bad leftover "${raw}" for "${clubId}" (a number of millions, 0 or more)`);
+      leftovers[clubId] = n;
+    }
   }
 
-  return { tournamentName, seasonNumber, budgetStep, seed, poolSeed, finishingOrder };
+  return { tournamentName, seasonNumber, budgetStep, seed, poolSeed, finishingOrder, leftovers };
 }

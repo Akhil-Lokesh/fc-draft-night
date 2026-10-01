@@ -133,19 +133,18 @@ test("in a built-in room, players already in the room don't show up in pool sear
  * over the real socket — season number, per-club finishing-position budget differential, and
  * pool players are all live in room state from the moment the room is created.
  */
-test("a tournament CSV sets season, per-club budgets from finishing position, and seeds the pool", async () => {
+test("a tournament CSV sets season, per-club budgets from leftover + standings, and seeds the pool", async () => {
   const { url, io, http } = await boot(new Db(":memory:"), new FakeClock(0));
   const a = client(url);
 
   const csv = `
 tournament,Friday Night League
 season,2
-budgetStep,50
 
 ## TEAMS
-club,finishingPosition
-Chelsea,2
-Atletico Madrid,1
+club,finishingPosition,leftover
+Chelsea,2,40
+Atletico Madrid,1,25
 
 ## SQUADS
 club,player
@@ -159,7 +158,7 @@ club,player
 Newcastle United,Bruno Guimarães
 `;
   const created = new Promise<any>(res => a.once("created", res));
-  a.emit("create", { totalBudget: 300, rosterCsv: csv });
+  a.emit("create", { rosterCsv: csv });
   const { code } = await created;
 
   const joined = new Promise<any>(res => a.once("state", res));
@@ -167,10 +166,14 @@ Newcastle United,Bruno Guimarães
   const state = await joined;
 
   expect(state.seasonNumber).toBe(2);
-  // worst-first: Chelsea (2nd) gets the base 300, Atletico (1st) gets base + 1*step = 350
+  expect(state.tournamentName).toBe("Friday Night League"); // kept on the room, shown at full time
+  // Chelsea finished last: just its leftover (40). Atletico won it: leftover 25 + one place above last (20) = 45.
   const ana = Object.values(state.managers as Record<string, any>)[0] as any;
-  expect(ana.spendable).toBe(300 - ana.reserved);
-  expect(state.clubBudgets["atletico-madrid"]).toBe(350);
+  expect(ana.spendable).toBeCloseTo(40, 5);
+  const squadOf = (club: string) => (Object.values(state.players as Record<string, any>) as any[])
+    .filter((p) => p.homeClub === club).reduce((sum, p) => sum + p.originalValue, 0);
+  expect(state.clubBudgets["atletico-madrid"] - squadOf("atletico-madrid")).toBeCloseTo(45, 5);
+  expect(state.clubBudgets["chelsea"] - squadOf("chelsea")).toBeCloseTo(40, 5);
   // pool player from the CSV's POOL section is already in the room, unowned
   const poolPlayer = Object.values(state.players as Record<string, any>).find((p: any) => p.name === "Bruno Guimarães") as any;
   expect(poolPlayer).toBeTruthy();

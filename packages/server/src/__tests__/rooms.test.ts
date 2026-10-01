@@ -145,3 +145,38 @@ test("after a restart, new room codes skip ones already saved instead of overwri
   expect(code).toBe("A2");
   expect(db.has("A1")).toBe(true);
 });
+
+// ---- budgets: 1500 is fixed; from season 2 it is leftover money plus 20M per place above last ----
+test("a room needs no budget typed in: a 5-star club gets 1500, each half star lower 150 less", async () => {
+  const rs = storeWithCatalog();
+  const csv = "club,player\nChelsea,C. Palmer\nChelsea,M. Caicedo\nAtletico Madrid,J. Alvarez\n";
+  const { code } = await rs.create({ rosterCsv: csv } as any);
+  expect(rs.get(code)!.totalBudget).toBe(1500);
+  expect(rs.get(code)!.clubBudgets["chelsea"]).toBe(1350); // a 4.5-star club
+});
+
+test("season 2: each club starts with its leftover money plus 20M for every place above last", async () => {
+  const rs = storeWithCatalog();
+  const csv = `
+tournament,League
+season,2
+
+## TEAMS
+club,finishingPosition,leftover
+Chelsea,2,35.5
+Atletico Madrid,1,12
+
+## SQUADS
+club,player
+Chelsea,C. Palmer
+Chelsea,M. Caicedo
+Atletico Madrid,J. Alvarez
+`;
+  const { code } = await rs.create({ rosterCsv: csv } as any);
+  const a = await rs.join(code, { displayName: "Ana", clubId: "chelsea" });
+  const b = await rs.join(code, { displayName: "Bo", clubId: "atletico-madrid" });
+  const room = rs.get(code)!;
+  expect(room.managers[a.managerId]!.spendable).toBeCloseTo(35.5 + 0, 5); // 2nd of 2: last place, no bonus
+  expect(room.managers[b.managerId]!.spendable).toBeCloseTo(12 + 20, 5); // champion: one place above last
+  expect(room.seasonNumber).toBe(2);
+});

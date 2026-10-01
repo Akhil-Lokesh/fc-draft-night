@@ -52,7 +52,6 @@ export function Join({
     <div className="page page-narrow">
       <header className="page-head rise">
         {onBack && <button className="btn btn-text" onClick={onBack}>← Back</button>}
-        <p className="kicker">Join the draft</p>
         <Brand size="md" />
       </header>
 

@@ -52,3 +52,17 @@ test("a back-to-home control is always available on the closed screen", async ()
   await userEvent.click(screen.getByRole("button", { name: /home/i }));
   expect(onHome).toHaveBeenCalled();
 });
+
+test("the header names the tournament beside Full time when the room has one", () => {
+  const r = room();
+  r.tournamentName = "APL S01";
+  render(<FullTime room={r} myId="m_real" onExport={() => {}} />);
+  const tag = screen.getByText(/full time/i).closest("p")!;
+  expect(tag.textContent).toMatch(/Full time.*APL S01.*Season 1/i);
+});
+
+test("without a tournament name the header is just Full time and the season", () => {
+  render(<FullTime room={room()} myId="m_real" onExport={() => {}} />);
+  const tag = screen.getByText(/full time/i).closest("p")!;
+  expect(tag.textContent).toMatch(/^Full time\s*Season 1$/i);
+});

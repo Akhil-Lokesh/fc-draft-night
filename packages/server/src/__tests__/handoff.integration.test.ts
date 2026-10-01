@@ -25,11 +25,13 @@ test("exportSeason returns a CSV with the expected sections", async () => {
   });
 
   expect(typeof exportResult.csv).toBe("string");
-  expect(exportResult.csv).toMatch(/## MANAGERS/);
+  // the same format as the roster upload, for season 2
+  expect(exportResult.csv).toMatch(/^season,2$/m);
+  expect(exportResult.csv).toMatch(/## TEAMS/);
   expect(exportResult.csv).toMatch(/## SQUADS/);
-  expect(exportResult.csv).toMatch(/## LOG/);
-  expect(exportResult.csv).toMatch(/finishingPosition/);
-  expect(exportResult.filename).toMatch(/^fcdn-season-1-EXPORT1\.csv$/);
+  expect(exportResult.csv).toMatch(/club,finishingPosition/);
+  expect(exportResult.csv).not.toMatch(/## LOG|## MANAGERS/);
+  expect(exportResult.filename).toBe("fcdn-season-2-roster.csv");
 
   a.close(); io.close(); http.close();
 });
@@ -56,10 +58,9 @@ test("importSeason with a filled-in CSV opens season N+1 and broadcasts the reba
     a.emit("exportSeason", { code: "IMPORT1" });
   });
 
-  // Fill finishing positions: Bayern finished 1st, Real finished 2nd (of these 2 joined managers).
-  const filledCsv = (exportResult.csv as string)
-    .replace(/(m_real,[^\n]*),$/m, "$1,2")
-    .replace(/(m_bayern,[^\n]*),$/m, "$1,1");
+  // Fill finishing positions in the TEAMS section: Bayern finished 1st, Real finished 2nd.
+  const filledCsv = (exportResult.csv as string).replace(/^([^#,\n][^,\n]*),,(\d[^\n]*)$/gm, (m, club: string, left: string) =>
+    /real/i.test(club) ? `${club},2,${left}` : /bayern/i.test(club) ? `${club},1,${left}` : m);
 
   const bNextState = new Promise<any>(res => b.on("state", (st: any) => { if (st.seasonNumber === 2) res(st); }));
   a.emit("importSeason", { code: "IMPORT1", csv: filledCsv, base: 600, step: 20 });
