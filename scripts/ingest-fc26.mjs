@@ -77,6 +77,7 @@ for (const { r } of byId.values()) {
     overall: Number(r[col.overall] || 0),
     club,
     clubId,
+    ...(Number(r[col.club_jersey_number]) > 0 ? { clubNumber: Number(r[col.club_jersey_number]) } : {}),
   });
 }
 catalog.sort((a, b) => b.value - a.value);

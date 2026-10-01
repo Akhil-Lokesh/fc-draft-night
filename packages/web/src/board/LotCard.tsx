@@ -151,7 +151,7 @@ export function LotCard({
           />
         </div>
         {!disabled && !amountOk && <p className="bid-hint" role="status">Must be above {money(topBid)}</p>}
-        <button className="btn btn-flare btn-block" disabled={disabled || !amountOk} onClick={() => onBid(contest.id, amount)}>
+        <button className="btn btn-flare btn-block" disabled={disabled || !amountOk} onClick={() => { onBid(contest.id, amount); setDraft(null); }}>
           {isListing ? "Bid" : "Raise"} · {amountOk ? money(amount) : "enter a price"}
         </button>
       </div>

@@ -15,6 +15,8 @@ export interface CreateOpts {
   squadSizeCap?: number | null;
   capacity?: number;
   rosterCsv?: string;
+  /** A solo-testing room: start alone and play every seat. */
+  testMode?: boolean;
 }
 
 /** The server's answer to a peek, always naming the code it answers for. */
@@ -53,6 +55,10 @@ export interface UiState {
   catalogResults: CatalogPlayer[];
   seasonExport: { csv: string; filename: string } | null;
   roomPeek: RoomPeek | null;
+  /** Test rooms: the seat the host is playing right now, or null for their own. Sent as `as` with
+   *  every command; the server refuses it anywhere but a test room. */
+  actingAs: string | null;
+  setActingAs(managerId: string | null): void;
 
   create(opts: CreateOpts): void;
   join(p: JoinPayload): void;
@@ -108,6 +114,7 @@ export function makeStore(t: Transport) {
 
   const store = createStore<UiState>((set, get) => {
     const code = () => get().room?.code ?? get().createdCode ?? undefined;
+    const as = () => get().actingAs ?? undefined; // omitted from the wire when it's just me
     return {
       room: null,
       managerId: null,
@@ -116,6 +123,8 @@ export function makeStore(t: Transport) {
       catalogResults: [],
       seasonExport: null,
       roomPeek: null,
+      actingAs: null,
+      setActingAs: (managerId) => set({ actingAs: managerId }),
 
       create: (opts) => { leftCode = null; t.emit("create", opts); },
       join: (p) => {
@@ -128,10 +137,10 @@ export function makeStore(t: Transport) {
       },
       peekRoom: (code) => { peekedCode = code; set({ roomPeek: null }); t.emit("peekRoom", { code }); },
       start: () => t.emit("start", { code: code() }),
-      openListing: (playerId) => t.emit("openListing", { code: code(), playerId }),
-      challenge: (playerId, amount) => t.emit("challenge", { code: code(), playerId, amount }),
-      bid: (contestId, amount) => t.emit("bid", { code: code(), contestId, amount }),
-      forfeit: (contestId) => t.emit("forfeit", { code: code(), contestId }),
+      openListing: (playerId) => t.emit("openListing", { code: code(), playerId, as: as() }),
+      challenge: (playerId, amount) => t.emit("challenge", { code: code(), playerId, amount, as: as() }),
+      bid: (contestId, amount) => t.emit("bid", { code: code(), contestId, amount, as: as() }),
+      forfeit: (contestId) => t.emit("forfeit", { code: code(), contestId, as: as() }),
       endDraft: () => t.emit("endDraft", { code: code() }),
       search: (q) => t.emit("searchCatalog", { ...q, code: code() }),
       setPool: (ids) => t.emit("setPool", { code: code(), ids }),
@@ -146,7 +155,7 @@ export function makeStore(t: Transport) {
         if (was) { leftCode = was; t.emit("leave", { code: was }); }
         lastJoin = null;
         clearJoin();
-        set({ room: null, managerId: null, createdCode: null, roomPeek: null });
+        set({ room: null, managerId: null, createdCode: null, roomPeek: null, actingAs: null });
       },
     };
   });

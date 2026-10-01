@@ -39,7 +39,8 @@ export function starsFor(clubName: string): number | null {
   return null;
 }
 
-/** Linear: 5.0 stars = €1500M, every 0.5 stars down = €150M less (so 0.5 stars = €150M). */
-export function budgetForStars(stars: number): number {
-  return Math.round(stars * 300);
+/** A club's budget from its star rating: a 5-star club gets `fiveStarBudget` (what the host types, at
+ *  least 1500M) and every 0.5 stars down is 150M less. With the default 1500M that is stars x 300. */
+export function budgetForStars(stars: number, fiveStarBudget = 1500): number {
+  return Math.max(0, Math.round(fiveStarBudget - 150 * ((5 - stars) / 0.5)));
 }

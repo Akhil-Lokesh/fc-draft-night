@@ -27,6 +27,9 @@ export interface Manager {
   reserved: number; spendable: number;
   /** TEAM_PALETTE id, unique within the room (see colors.ts). Optional for rooms saved before. */
   colorId?: string;
+  /** A stand-in seat the server filled when a test room started short of players. Nobody can join
+   *  it; the host plays it by switching seats (see RoomState.testMode). */
+  practice?: boolean;
 }
 
 export type ContestType = "pool-listing" | "release-listing" | "war";
@@ -77,6 +80,9 @@ export interface RoomState {
    *  A club absent here just uses `totalBudget`, same as before this existed. */
   clubBudgets: Record<string, number>;
   seasonNumber: number;
+  /** A solo-testing room: the host may start without a full room (empty seats become practice
+   *  managers) and may act as any seat. Set only when the room is created; ordinary rooms never have it. */
+  testMode?: boolean;
   status: "setup" | "live" | "closed";
   startedAt: number | null;
   /** Manager who created the room (the first to join). Optional: rooms saved before this existed
@@ -104,7 +110,7 @@ export const LISTING_MS = 120_000;         // 2-minute listing window
 export function createRoom(opts: {
   code: string; totalBudget: number; seed: SeedPlayer[];
   quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number;
-  seasonNumber?: number; clubBudgets?: Record<string, number>;
+  seasonNumber?: number; clubBudgets?: Record<string, number>; testMode?: boolean;
 }): RoomState {
   const players: Record<string, Player> = {};
   const clubNames: Record<string, string> = {};
@@ -126,6 +132,7 @@ export function createRoom(opts: {
     clubNames,
     clubBudgets: opts.clubBudgets ?? {},
     seasonNumber: opts.seasonNumber ?? 1, status: "setup", startedAt: null,
+    ...(opts.testMode ? { testMode: true } : {}),
     managers: {}, players, contests: {}, challenges: {}, log: [], seq: 0,
   };
 }

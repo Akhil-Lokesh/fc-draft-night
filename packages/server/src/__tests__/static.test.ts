@@ -13,6 +13,7 @@ beforeAll(async () => {
   writeFileSync(join(root, "index.html"), "<!doctype html>app");
   writeFileSync(join(root, "assets", "a.js"), "console.log(1)");
   writeFileSync(join(root, "manifest.webmanifest"), "{}");
+  writeFileSync(join(root, "roster-template.csv"), "club,player\n");
   writeFileSync(join(dir, "secret.sqlite"), "SECRET"); // next to dist, must never be served
   server = createServer(staticHandler(root));
   await new Promise<void>((r) => server.listen(0, r));
@@ -31,6 +32,12 @@ test("the install manifest is served as a web app manifest, so phones offer Add 
   const res = await fetch(`${url}/manifest.webmanifest`);
   expect(res.headers.get("content-type")).toBe("application/manifest+json");
   expect(res.headers.get("cache-control")).toBe("no-cache"); // not fingerprinted, so never cached for good
+});
+
+test("the roster template downloads as a CSV file", async () => {
+  const res = await fetch(`${url}/roster-template.csv`);
+  expect(res.headers.get("content-type")).toMatch(/^text\/csv/);
+  expect(await res.text()).toBe("club,player\n");
 });
 
 test("unknown paths fall back to the app page (single-page app)", async () => {

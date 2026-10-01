@@ -63,7 +63,7 @@ test("deficit repair runs once per tick batch: a still-open war contest's player
   // stolen by an interleaved deficit repair before cY was finalized.
   expect(courtoisAfter.ownerId).toBe("bay");
   expect(cY.status).toBe("closed");
-  // real ends the batch solvent.
+  // real ends the batch solvent: the fine took him to -5, then selling courtois refunded his 20.
   expect(realAfter.spendable).toBeGreaterThanOrEqual(0);
   // Crucially: no fire-sale "release" of courtois should appear in the log. A per-contest deficit
   // repair (the bug) force-releases courtois to the pool via coverDeficit BEFORE cY's war finalizes,

@@ -20,7 +20,7 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
     // Host creates the room and gets back a shareable code, then joins as the first manager.
     // Kept separate from `join` so a room only ever comes into existence through this one path
     // (join throws "no such room" for an unknown code — it never auto-creates).
-    socket.on("create", async (p: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number; rosterCsv?: string }) => {
+    socket.on("create", async (p: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number; rosterCsv?: string; testMode?: boolean }) => {
       try {
         const { code } = await store.create(p);
         // Only the creator learns this key; their join carrying it is what makes them host.
@@ -140,14 +140,51 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
       return true;
     };
 
+    /** Who a command is for. Normally the socket's own manager; in a TEST room the host may pass `as` to act
+     *  for any seat (that is how one person plays a whole draft). Everywhere else `as` is refused, never ignored. */
+    const actor = (s: RoomState, as?: string): string => {
+      const me = joined!.managerId;
+      if (!as || as === me) return me;
+      if (!s.testMode) throw new Error("acting for another seat only works in test rooms");
+      if (hostOf(s) !== me) throw new Error("only the host can act for another seat");
+      if (!s.managers[as]) throw new Error("no such seat");
+      return as;
+    };
+
+    /** Test rooms only: give every still-empty seat a practice manager on a club nobody has taken. */
+    const fillPracticeSeats = async (code: string) => {
+      const s = store.get(code);
+      if (!s) return;
+      const taken = new Set(Object.values(s.managers).map((m) => m.clubId));
+      const free = Object.keys(s.clubNames).filter((id) => !taken.has(id));
+      let missing = s.capacity - Object.keys(s.managers).length;
+      for (let n = 1; missing > 0 && free.length > 0; n++, missing--) {
+        const { managerId } = await store.join(code, { displayName: `Practice ${n}`, clubId: free.shift()! });
+        const hash = hashSeatKey(newSeatKey()); // a key nobody is ever given: the seat can't be claimed
+        await store.run(code, (st: RoomState) => ({
+          state: {
+            ...st,
+            seatKeys: { ...st.seatKeys, [managerId]: hash },
+            managers: { ...st.managers, [managerId]: { ...st.managers[managerId]!, practice: true } },
+          },
+          events: [],
+        }));
+      }
+    };
+
     const cmd = (code: string, make: (s: RoomState) => Parameters<typeof applyCommand>[1]) => {
       if (!mine(code)) return;
       return store.run(code, (s: RoomState) => applyCommand(s, make(s))).then(() => broadcast(code)).catch((e: Error) => socket.emit("error", e.message));
     };
 
     // Only a full room may start: the check runs inside the room's queue, so a join racing the start can't slip past it.
-    socket.on("start", (p: { code: string }) => {
+    // A TEST room is the exception: the host can start alone, and the empty seats are first filled with
+    // practice managers (nobody can join them) that the host plays by switching seats.
+    socket.on("start", async (p: { code: string }) => {
       if (!asHost(p.code)) return;
+      try {
+        if (store.get(p.code)?.testMode) await fillPracticeSeats(p.code);
+      } catch (e) { socket.emit("error", (e as Error).message); return; }
       cmd(p.code, (s) => {
         const missing = s.capacity - Object.keys(s.managers).length;
         if (missing > 0) throw new Error(`waiting for ${missing} more manager${missing === 1 ? "" : "s"}`);
@@ -155,17 +192,17 @@ export function attachGateway(io: Server, store: RoomStore, clock: Clock, catalo
       });
     });
     // OpenListing = claim a pool player or release your own (server infers which from ownership).
-    socket.on("openListing", (p: { code: string; playerId: string }) =>
-      cmd(p.code, () => ({ type: "OpenListing", managerId: joined!.managerId, playerId: p.playerId, now: clock.now() })));
+    socket.on("openListing", (p: { code: string; playerId: string; as?: string }) =>
+      cmd(p.code, (s) => ({ type: "OpenListing", managerId: actor(s, p.as), playerId: p.playerId, now: clock.now() })));
     // Challenge = go after a player owned by a rival; the client must name its opening bid.
-    socket.on("challenge", (p: { code: string; playerId: string; amount: number }) =>
-      cmd(p.code, () => ({ type: "Challenge", managerId: joined!.managerId, playerId: p.playerId, amount: p.amount, now: clock.now() })));
-    socket.on("bid", (p: { code: string; contestId: string; amount: number }) =>
-      cmd(p.code, () => ({ type: "PlaceBid", contestId: p.contestId, managerId: joined!.managerId, amount: p.amount, now: clock.now() })));
+    socket.on("challenge", (p: { code: string; playerId: string; amount: number; as?: string }) =>
+      cmd(p.code, (s) => ({ type: "Challenge", managerId: actor(s, p.as), playerId: p.playerId, amount: p.amount, now: clock.now() })));
+    socket.on("bid", (p: { code: string; contestId: string; amount: number; as?: string }) =>
+      cmd(p.code, (s) => ({ type: "PlaceBid", contestId: p.contestId, managerId: actor(s, p.as), amount: p.amount, now: clock.now() })));
     // Forfeit = a manager involved in the war gives up; owner giving up ends it now, anyone
     // else giving up just drops them from further bidding (server-side rules in domain/war.ts).
-    socket.on("forfeit", (p: { code: string; contestId: string }) =>
-      cmd(p.code, () => ({ type: "Forfeit", contestId: p.contestId, managerId: joined!.managerId, now: clock.now() })));
+    socket.on("forfeit", (p: { code: string; contestId: string; as?: string }) =>
+      cmd(p.code, (s) => ({ type: "Forfeit", contestId: p.contestId, managerId: actor(s, p.as), now: clock.now() })));
     // Host-only: force-resolve every open contest right now and close the room.
     socket.on("endDraft", (p: { code: string }) => { if (asHost(p.code)) cmd(p.code, () => ({ type: "EndDraft", now: clock.now() })); });
 

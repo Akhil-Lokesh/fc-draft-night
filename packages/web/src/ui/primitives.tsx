@@ -79,7 +79,14 @@ export function Flap({ children, tone, size = "md", label }: { children: ReactNo
 }
 
 export function Money({ n, className = "" }: { n: number; className?: string }) {
-  return <span className={`money ${className}`}>{money(n)}</span>;
+  // The euro sign is drawn by CSS before the number, so a minus is its own span that CSS puts in front: "−€195.7M".
+  const neg = n < 0 && Math.round(Math.abs(n) * 10) > 0;
+  return (
+    <span className={`money ${neg ? "is-neg" : ""} ${className}`}>
+      {neg && <span className="money-sign">{"\u2212"}</span>}
+      {money(Math.abs(n))}
+    </span>
+  );
 }
 
 export function Pos({ children }: { children: ReactNode }) {

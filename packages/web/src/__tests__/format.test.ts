@@ -40,3 +40,9 @@ test("crests: a club outside the top 50 gets no logo (keeps the lettered shield)
   expect(crestUrl("sheffield-wednesday", "Sheffield Wednesday")).toBeNull();
   expect(crestUrl("afc-wimbledon", "AFC Wimbledon")).toBeNull(); // "AFC" alone must not match Arsenal
 });
+
+test("a negative amount reads as a proper minus, not a stray dash", () => {
+  expect(money(-195.7)).toBe("\u2212195.7M");
+  expect(money(-3)).toBe("\u22123M");
+  expect(money(0)).toBe("0M");
+});

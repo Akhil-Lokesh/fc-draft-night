@@ -16,6 +16,84 @@ function room(): any {
 
 const actions = { bid: () => {}, openListing: () => {}, challenge: () => {}, forfeit: () => {} };
 
+function testRoom(): any {
+  const r = room();
+  r.testMode = true;
+  r.managers.m_bar = { id: "m_bar", displayName: "Practice 1", clubId: "barca", reserved: 0, spendable: 500, practice: true };
+  return r;
+}
+
+test("the host of a test room gets a 'Playing as' switcher listing every seat", async () => {
+  const onSwitch = vi.fn();
+  render(<DraftBoard room={testRoom()} myId="m_real" now={0} actions={actions} iAmHost seatSwitcher={{ onSwitch }} />);
+  const pick = screen.getByRole("combobox", { name: /playing as/i }) as HTMLSelectElement;
+  expect(pick.value).toBe("m_real");
+  expect([...pick.options].map((o) => o.value)).toEqual(["m_bar", "m_real"].sort());
+  expect(within(pick).getByRole("option", { name: /practice/i })).toBeTruthy();
+  await userEvent.selectOptions(pick, "m_bar");
+  expect(onSwitch).toHaveBeenCalledWith("m_bar");
+});
+
+test("no switcher without the prop, even in a test room", () => {
+  render(<DraftBoard room={testRoom()} myId="m_real" now={0} actions={actions} iAmHost />);
+  expect(screen.queryByRole("combobox", { name: /playing as/i })).toBeNull();
+});
+
+test("an ordinary room never shows a seat switcher", () => {
+  render(<DraftBoard room={room()} myId="m_real" now={0} actions={actions} iAmHost />);
+  expect(screen.queryByRole("combobox", { name: /playing as/i })).toBeNull();
+});
+
+function inTheRedRoom(by = 195.7): any {
+  const r = room();
+  r.managers.m_real = { ...r.managers.m_real, spendable: -by };
+  r.managers.m_bar = { id: "m_bar", displayName: "Bo", clubId: "barca", reserved: 0, spendable: 300 };
+  return r;
+}
+
+test("someone over budget is called out for everyone, with how far over", () => {
+  render(<DraftBoard room={inTheRedRoom()} myId="m_bar" now={0} actions={actions} />);
+  const note = screen.getByRole("status", { name: /over budget/i });
+  expect(note).toHaveTextContent(/Real Madrid/);
+  expect(note).toHaveTextContent(/195\.7/);
+  expect(note).toHaveTextContent(/can't end/i);
+});
+
+test("if I'm the one over budget, I'm told to release players, and that it's on me", () => {
+  render(<DraftBoard room={inTheRedRoom()} myId="m_real" now={0} actions={actions} />);
+  const note = screen.getByRole("status", { name: /over budget/i });
+  expect(note).toHaveTextContent(/you're/i);
+  expect(note).toHaveTextContent(/release/i);
+});
+
+test("no over-budget notice when everyone is at zero or better", () => {
+  render(<DraftBoard room={room()} myId="m_real" now={0} actions={actions} />);
+  expect(screen.queryByRole("status", { name: /over budget/i })).toBeNull();
+});
+
+test("the host's End auction is switched off while anyone is over budget, and says why", () => {
+  render(<DraftBoard room={inTheRedRoom()} myId="m_bar" now={0} actions={actions} iAmHost onEndDraft={() => {}} />);
+  const end = screen.getByRole("button", { name: /end auction/i });
+  expect(end).toBeDisabled();
+  expect(end.getAttribute("title")).toMatch(/over budget/i);
+});
+
+test("End auction works as before when nobody is over budget", async () => {
+  const onEnd = vi.fn();
+  render(<DraftBoard room={room()} myId="m_real" now={0} actions={actions} iAmHost onEndDraft={onEnd} />);
+  const end = screen.getByRole("button", { name: /end auction/i });
+  expect(end).toBeEnabled();
+  await userEvent.click(end);
+  await userEvent.click(screen.getByRole("button", { name: /confirm end/i }));
+  expect(onEnd).toHaveBeenCalledTimes(1);
+});
+
+test("once the clock has run out the header says OVERTIME instead of a dead 0:00", () => {
+  const r = inTheRedRoom();
+  render(<DraftBoard room={r} myId="m_bar" now={r.startedAt + r.draftClockMs + 5_000} actions={actions} />);
+  expect(screen.getByLabelText(/draft clock/i)).toHaveTextContent(/overtime/i);
+});
+
 test("an alert appears when one of my players is under challenge", () => {
   render(<DraftBoard room={room()} myId="m_real" now={0} actions={actions} />);
   const alert = screen.getByRole("alert");

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
-import { budgetFloor, hostOf, loadSeed, teamColors } from "@fcdn/shared";
+import { hostOf, teamColors } from "@fcdn/shared";
 import { makeStore, connect, useUi, savedManagerId, type UiStore } from "./state/socket.js";
-import { CLUBS, ClubNames, TeamColors } from "./lib/clubs.js";
+import { ClubNames, TeamColors } from "./lib/clubs.js";
 import { Landing } from "./screens/Landing.js";
 import { Setup } from "./screens/Setup.js";
 import { Join, type JoinFields } from "./screens/Join.js";
@@ -12,7 +12,9 @@ import { FullTime } from "./screens/FullTime.js";
 import { PoolBuilder } from "./board/PoolBuilder.js";
 import { VoiceClient, VoiceContext } from "./lib/voice.js";
 
-const FLOOR = budgetFloor(loadSeed());
+// Lowest budget the host can type. (It used to be derived from the built-in squads, which no longer exist;
+// the server still checks every club's own squad value against its own budget.)
+const FLOOR = 1500;
 // Same origin by default: the dev server proxies /socket.io to the game server (vite.config.ts), so
 // the app works through one https link — required for the mic on phones and for remote friends.
 const SERVER_URL = (import.meta as any).env?.VITE_SERVER_URL ?? location.origin;
@@ -50,6 +52,7 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
   const catalogResults = useUi(store, (s) => s.catalogResults);
   const seasonExport = useUi(store, (s) => s.seasonExport);
   const roomPeek = useUi(store, (s) => s.roomPeek);
+  const actingAs = useUi(store, (s) => s.actingAs);
   const now = useNow();
 
   const urlCode = useMemo(() => new URLSearchParams(location.search).get("room") ?? "", []);
@@ -102,6 +105,10 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
   const leaveRoom = () => { voice?.leave(); store.getState().leave(); setIAmHost(false); goHome(); };
   // The server knows who the host is, so a refreshed host tab keeps its host controls.
   const amHost = iAmHost || (!!room && !!managerId && hostOf(room) === managerId);
+  // Test rooms: the host can play any seat. `viewId` is the seat the board is shown for (their own unless
+  // they switched); every command goes out as that seat, and the server re-checks all of it.
+  const testHost = !!room?.testMode && amHost;
+  const viewId = testHost && actingAs && room?.managers[actingAs] ? actingAs : managerId;
 
   // The host approved my leave request: I've been removed from the room, so head home. Only once
   // I've actually been seen in it — never on a state that simply predates my join landing.
@@ -119,7 +126,7 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
     const byManager = teamColors(room);
     return Object.fromEntries(Object.values(room.managers).map((m) => [m.clubId, byManager[m.id]!]));
   }, [room]);
-  const myColor = room && managerId ? teamColors(room)[managerId] : undefined;
+  const myColor = room && viewId ? teamColors(room)[viewId] : undefined;
   useEffect(() => {
     const root = document.documentElement.style;
     if (!myColor) {
@@ -134,7 +141,17 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
   let screen;
   if (room && managerId) {
     if (room.status === "live") {
-      screen = <DraftBoard room={room} myId={managerId} now={now} actions={actions} iAmHost={amHost} onEndDraft={() => store.getState().endDraft()} />;
+      screen = (
+        <DraftBoard
+          room={room}
+          myId={viewId ?? managerId}
+          now={now}
+          actions={actions}
+          iAmHost={amHost}
+          onEndDraft={() => store.getState().endDraft()}
+          seatSwitcher={testHost ? { onSwitch: (id) => store.getState().setActingAs(id === managerId ? null : id) } : undefined}
+        />
+      );
     } else if (room.status === "closed") {
       screen = (
         <FullTime
@@ -171,7 +188,6 @@ export function App({ store: injected }: { store?: UiStore } = {}) {
     screen = (
       <Setup
         floor={FLOOR}
-        maxCapacity={CLUBS.length}
         startLabel="Create room"
         onBack={goHome}
         onStart={(cfg) => { setIAmHost(true); store.getState().create(cfg); }}

@@ -201,3 +201,36 @@ test("the host key from create rides along on that room's join, and only that on
   store.getState().join({ code: "ZZ", displayName: "A", clubId: "city" });
   expect(t.emitted.at(-1)!.p.hostKey).toBeUndefined();
 });
+
+test("commands carry the seat the host is acting as, and nothing extra otherwise", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  t.fire("state", { code: "AB", managers: {}, players: {}, contests: {} });
+  const last = () => t.emitted.at(-1)!;
+
+  store.getState().bid("c1", 200);
+  expect(last().p.as).toBeUndefined(); // ordinary play sends no `as`
+
+  store.getState().setActingAs("m_arsenal");
+  store.getState().bid("c1", 201);
+  expect(last()).toMatchObject({ ev: "bid", p: { code: "AB", contestId: "c1", amount: 201, as: "m_arsenal" } });
+  store.getState().openListing("p1");
+  expect(last()).toMatchObject({ ev: "openListing", p: { playerId: "p1", as: "m_arsenal" } });
+  store.getState().challenge("p2", 50);
+  expect(last()).toMatchObject({ ev: "challenge", p: { playerId: "p2", amount: 50, as: "m_arsenal" } });
+  store.getState().forfeit("c1");
+  expect(last()).toMatchObject({ ev: "forfeit", p: { contestId: "c1", as: "m_arsenal" } });
+
+  store.getState().setActingAs(null);
+  store.getState().bid("c1", 202);
+  expect(last().p.as).toBeUndefined();
+});
+
+test("leaving the room stops acting as another seat", () => {
+  const t = fakeTransport();
+  const store = makeStore(t as any);
+  t.fire("state", { code: "AB", managers: {}, players: {}, contests: {} });
+  store.getState().setActingAs("m_arsenal");
+  store.getState().leave();
+  expect(store.getState().actingAs).toBeNull();
+});

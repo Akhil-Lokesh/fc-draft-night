@@ -25,3 +25,12 @@ test("budgetForStars is linear: 5 stars = 1500M, every 0.5 stars down = 150M les
   expect(budgetForStars(3.0)).toBe(900);
   expect(budgetForStars(0.5)).toBe(150);
 });
+
+test("the 5-star budget is whatever the host sets; every 0.5 stars down is still 150M less", () => {
+  expect(budgetForStars(5.0, 1800)).toBe(1800);
+  expect(budgetForStars(4.5, 1800)).toBe(1650);
+  expect(budgetForStars(4.0, 1800)).toBe(1500);
+  expect(budgetForStars(0.5, 1800)).toBe(450);
+  expect(budgetForStars(0.5, 1500)).toBe(150); // same as before at the default
+  expect(budgetForStars(0.5, 1000)).toBe(0); // never negative
+});

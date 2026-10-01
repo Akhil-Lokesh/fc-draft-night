@@ -40,6 +40,28 @@ test("once the room is full the host's Start button is live", async () => {
   expect(onStart).toHaveBeenCalledTimes(1);
 });
 
+test("the host of a test room can start alone, and the button says it's a test", async () => {
+  const onStart = vi.fn();
+  render(<Lobby room={{ ...room, testMode: true }} myId="m_arsenal" iAmHost onStart={onStart} />); // 1 of 5 seats taken
+  const start = screen.getByRole("button", { name: /start test draft/i }) as HTMLButtonElement;
+  expect(start.disabled).toBe(false);
+  await userEvent.click(start);
+  expect(onStart).toHaveBeenCalledTimes(1);
+  expect(screen.getAllByText(/test room/i).length).toBeGreaterThan(0); // the room says what it is
+  expect(screen.getByText(/practice managers/i)).toBeTruthy(); // and what will happen to the empty seats
+});
+
+test("a guest in a test room is told it's a test room, with no start button", () => {
+  render(<Lobby room={{ ...room, testMode: true }} myId="m_arsenal" iAmHost={false} onStart={() => {}} />);
+  expect(screen.queryByRole("button", { name: /start/i })).toBeNull();
+  expect(screen.getAllByText(/test room/i).length).toBeGreaterThan(0);
+});
+
+test("an ordinary room shows no test-room wording", () => {
+  render(<Lobby room={room} myId="m_arsenal" iAmHost onStart={() => {}} />);
+  expect(screen.queryByText(/test room|practice managers/i)).toBeNull();
+});
+
 test("the host's Leave control walks straight out, no approval needed", async () => {
   const onLeave = vi.fn();
   render(<Lobby room={room} myId="m_arsenal" iAmHost onStart={() => {}} onLeave={onLeave} />);

@@ -20,6 +20,19 @@ test("standings show each manager's spendable, richest first", () => {
   expect(screen.getByText(/34M/)).toBeTruthy();
 });
 
+test("only a negative balance is tinted red; a low but positive one looks like everyone else's", () => {
+  const ms = {
+    ...managers,
+    m_low: { id: "m_low", displayName: "Low", clubId: "real", reserved: 1400, spendable: 183 },
+    m_neg: { id: "m_neg", displayName: "Neg", clubId: "arsenal", reserved: 1700, spendable: -100 },
+  };
+  render(<Standings managers={ms as any} totalBudget={1600} myId="m_bay" challenges={{}} />);
+  const row = (name: RegExp) => screen.getAllByRole("row").find(r => name.test(r.textContent ?? ""))!;
+  expect(row(/Low/).querySelector("td.is-low, td.is-neg")).toBeNull();
+  expect(row(/Neg/).querySelector("td.is-neg")).toBeTruthy();
+  expect(row(/Bayern/).querySelector("td.is-low, td.is-neg")).toBeNull();
+});
+
 test("standings show my used/remaining challenges against each rival", () => {
   render(<Standings managers={managers as any} totalBudget={600} myId="m_bay" challenges={{ "m_bay->m_city": 2 }} />);
   expect(screen.getByText(/2\s*\/\s*3/)).toBeTruthy();

@@ -19,6 +19,9 @@ export interface SeedPlayer {
    *  player's specialty, shown on the confirm card before challenging/listing them. Absent for
    *  a synthetic player the database never heard of. */
   tags?: string[];
+  /** The player's shirt number at his club in the FC26 database — lets a roster row that names a
+   *  player the matcher can't find by name still be found by club + shirt number + rating. */
+  clubNumber?: number;
   value: number;
   overall: number;
   club: string;

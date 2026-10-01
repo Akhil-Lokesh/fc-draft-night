@@ -14,3 +14,10 @@ test("the landing page still shows the host/join actions alongside the rules", (
   expect(screen.getByRole("button", { name: /host a draft/i })).toBeTruthy();
   expect(screen.getByRole("button", { name: /join with a code/i })).toBeTruthy();
 });
+
+test("the rules say the auction can't end while anyone is over budget", () => {
+  render(<Landing onHost={() => {}} onJoin={() => {}} />);
+  expect(screen.getByText(/in the black/i)).toBeTruthy();
+  expect(screen.getByText(/can't end while anyone is over budget/i)).toBeTruthy();
+  expect(screen.getByText(/release players/i)).toBeTruthy();
+});

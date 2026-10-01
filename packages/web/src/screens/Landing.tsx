@@ -11,6 +11,7 @@ const LAWS: { title: string; body: React.ReactNode }[] = [
   { title: "The clock", body: "Every war runs its own countdown that resets on each new bid. No last-second sniping." },
   { title: "Overcommit", body: <>Win more than you can cover and it's a <b>{OVERCOMMIT_FINE}M fine</b>. The player goes to the next-best bidder or back to his old owner.</> },
   { title: "Locked in", body: "Win or successfully defend a player and he's locked for the season. No releasing him back." },
+  { title: "In the black", body: "The auction can't end while anyone is over budget, even when the clock runs out. If your squad is worth more than your budget, release players until you're back at zero." },
   { title: "Giving up", body: "If the owner concedes a defence, the war ends on the spot. A challenger giving up just drops out." },
 ];
 

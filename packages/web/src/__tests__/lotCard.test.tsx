@@ -41,6 +41,16 @@ test("you can clear the price box and type any price you like", async () => {
   expect(onBidSpy).toHaveBeenCalledWith("c1", 250);
 });
 
+test("after a bid goes out the price box goes back to a fresh suggestion, not the old typed price", async () => {
+  onBidSpy = vi.fn();
+  render(lot());
+  await userEvent.clear(priceBox());
+  await userEvent.type(priceBox(), "250");
+  await userEvent.click(screen.getByRole("button", { name: /raise/i }));
+  expect(onBidSpy).toHaveBeenCalledWith("c1", 250);
+  expect(priceBox().value).toBe("206"); // one above the top bid as this card still sees it (the parent supplies the new top)
+});
+
 test("the price can be a decimal just above the top bid", async () => {
   onBidSpy = vi.fn();
   render(lot());

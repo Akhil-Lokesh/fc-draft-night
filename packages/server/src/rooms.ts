@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import {
-  createRoom, addManager, addPoolPlayer, squadValue, positionStepBudgets, startNextSeason, MAX_MANAGERS,
+  createRoom, addManager, addPoolPlayer, positionStepBudgets, startNextSeason, MAX_MANAGERS,
   type RoomState, type SeedPlayer, type ClubId,
 } from "@fcdn/shared";
 import type { Queue } from "./queue.js";
@@ -11,16 +11,21 @@ import { starsFor, budgetForStars } from "./clubStars.js";
 
 const isTournamentCsv = (csv: string): boolean => /^##\s*SQUADS/im.test(csv);
 
+/** Lowest 5-star budget a host may set: every 0.5 stars down is 150M less, so this keeps even a
+ *  half-star club at 150M or more. */
+export const MIN_FIVE_STAR_BUDGET = 1500;
+
 /** Every club's budget comes from its real-world FC26 star rating (see clubStars.ts) whenever
- *  a roster is uploaded — a 5-star club plays with far more than a lower-tier one. A club the
- *  ratings file has never heard of falls back to the host's flat totalBudget instead of a guess. */
-function budgetsFromRoster(seed: SeedPlayer[], fallback: number): Record<string, number> {
+ *  a roster is uploaded, scaled from the budget the host typed: that is what a 5-star club gets and
+ *  each half star below is 150M less. A club the ratings file has never heard of gets the typed
+ *  budget itself instead of a guess. */
+function budgetsFromRoster(seed: SeedPlayer[], fiveStarBudget: number): Record<string, number> {
   const clubNameById = new Map<string, string>();
   for (const p of seed) if (p.clubId && !clubNameById.has(p.clubId)) clubNameById.set(p.clubId, p.club);
   const budgets: Record<string, number> = {};
   for (const [clubId, clubName] of clubNameById) {
     const stars = starsFor(clubName);
-    budgets[clubId] = stars !== null ? budgetForStars(stars) : fallback;
+    budgets[clubId] = stars !== null ? budgetForStars(stars, fiveStarBudget) : fiveStarBudget;
   }
   return budgets;
 }
@@ -60,9 +65,11 @@ export class RoomStore {
     return Math.min(MAX_MANAGERS, new Set(seed.map(p => p.clubId).filter((c): c is ClubId => c != null)).size);
   }
 
-  async create(opts: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number; rosterCsv?: string }): Promise<{ code: string }> {
+  async create(opts: { totalBudget: number; quoteTimerMs?: number; squadSizeCap?: number | null; capacity?: number; rosterCsv?: string; testMode?: boolean }): Promise<{ code: string }> {
     // An uploaded roster replaces the built-in 5-club seed entirely, so a room can be any real
     // club(s) in the FC26 database — every player in it has already been cross-checked.
+    // No built-in teams: a room's clubs come only from the roster the host uploads.
+    if (!opts.rosterCsv && this.seed.length === 0) throw new Error("upload a roster CSV to create a room");
     let seed = this.seed;
     let poolSeed: SeedPlayer[] = [];
     let tournament: TournamentRoster | null = null;
@@ -74,6 +81,12 @@ export class RoomStore {
       } else {
         seed = parseRosterCsv(opts.rosterCsv, this.fullCatalog);
       }
+    }
+
+    // Budgets come from star ratings unless this is a season-2+ tournament roster, where the typed number
+    // is the worst finisher's base instead. The 1500M minimum only makes sense for the star-based ones.
+    if (!tournament?.finishingOrder.length && !(opts.totalBudget >= MIN_FIVE_STAR_BUDGET)) {
+      throw new Error(`budget too low: a 5-star club needs at least ${MIN_FIVE_STAR_BUDGET}M`);
     }
 
     const max = this.maxCapacity(seed);
@@ -89,16 +102,13 @@ export class RoomStore {
       : opts.rosterCsv
         ? budgetsFromRoster(seed, opts.totalBudget)
         : {};
-    for (const clubId of new Set(seed.map(p => p.clubId).filter((c): c is ClubId => c != null))) {
-      const budget = clubBudgets[clubId] ?? opts.totalBudget;
-      const need = squadValue(seed, clubId);
-      if (budget < need) throw new Error(`budget too low for "${clubId}" (needs at least ${need})`);
-    }
+    // A squad worth more than its club's budget is fine: that manager starts in the red and has to release
+    // players (their choice) before the auction can end. See managersOverBudget in @fcdn/shared.
 
     const code = this.gen();
     let s = createRoom({
       code, totalBudget: opts.totalBudget, seed, quoteTimerMs: opts.quoteTimerMs, squadSizeCap: opts.squadSizeCap,
-      capacity: opts.capacity ?? max, seasonNumber: tournament?.seasonNumber, clubBudgets,
+      capacity: opts.capacity ?? max, seasonNumber: tournament?.seasonNumber, clubBudgets, testMode: opts.testMode === true,
     });
     for (const p of poolSeed) s = addPoolPlayer(s, p);
     this.q.setState(code, s);

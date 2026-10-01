@@ -393,8 +393,8 @@ button.sq:disabled { cursor: default; }
 .t-names small { color: var(--dim); font-size: 11px; }
 .t-bar { height: 3px; margin-top: 6px; background: rgba(255, 255, 255, 0.06); border-radius: 2px; overflow: hidden; }
 .t-bar i { display: block; height: 100%; background: var(--club); border-radius: 2px; transition: width 0.4s var(--ease); }
-.t-bar i.is-low { background: var(--hot); }
-.table td.is-low .money { color: #ff9c92; }
+.t-bar i.is-neg { background: var(--hot); }
+.table td.is-neg .money { color: #ff9c92; }
 .pips { display: inline-flex; align-items: center; gap: 3px; }
 .pips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-2); }
 .pips i.spent { background: var(--flare); border-color: var(--flare); }
@@ -600,3 +600,24 @@ button.sq:disabled { cursor: default; }
 }
 .vring-badge svg { width: 9px; height: 9px; }
 .vring-badge.is-muted { background: #ff9c92; }
+
+/* Test rooms: a slim strip under the header saying so, with the seat switcher. */
+.testbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px calc(16px + env(safe-area-inset-right, 0px)) 8px calc(16px + env(safe-area-inset-left, 0px));
+  background: var(--flare-soft); border-bottom: 1px solid var(--line);
+}
+.testbar-pick { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font: 600 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--chalk-2); }
+.testbar-pick span { flex: none; }
+.testbar-pick .input { min-height: 40px; min-width: 0; flex: 1; font-size: 15px; padding-right: 32px; text-transform: none; letter-spacing: 0; }
+@media (max-width: 400px) { .testbar-pick > span { display: none; } }
+
+/* Over budget: one calm bar under the ticker. It says who, by how much, and that the auction is held until they fix it. */
+.redbar {
+  display: grid; gap: 4px;
+  padding: 10px calc(16px + env(safe-area-inset-right, 0px)) 10px calc(16px + env(safe-area-inset-left, 0px));
+  background: var(--hot-soft); border-bottom: 1px solid rgba(255, 79, 63, 0.35);
+  color: #ffd2cc; font-size: 14px; line-height: 1.4;
+}
+.redbar p { margin: 0; }
+.redbar b { color: #fff; }

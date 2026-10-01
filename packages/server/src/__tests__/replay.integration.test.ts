@@ -133,18 +133,12 @@ test("multi-client replay: sync, ticker-driven overcommit cascade, and crash rec
 
   const cityAfter = resolved.managers[cityId]!;
   // City's spendable after deal 1 (tightSpendable - bidOnBayernPlayer) minus the overcommit fine
-  // goes negative here, so the engine's own deficit-repair (already proven in @fcdn/shared) kicks
-  // in and force-releases one of city's own cheapest, uncontested players to bring it back to >= 0.
-  // We only assert the wiring-relevant invariant here: city ends the batch solvent.
-  expect(cityAfter.spendable).toBeGreaterThanOrEqual(0);
-  // A fine was logged against city, and any deficit-repair release was one of city's OWN players,
-  // never the two contested players themselves (whose fates are decided by the war mechanics above).
+  // goes negative. Nothing is released for it: city stays in the red and must release players itself.
+  expect(cityAfter.spendable).toBeLessThan(0);
+  // A fine was logged against city, and no release was made on its behalf (the two contested players'
+  // fates are decided by the war mechanics above, and city's own squad is untouched).
   expect(resolved.log.some((e: any) => e.t === "fine" && e.managerId === cityId)).toBe(true);
-  const cityReleases = resolved.log.filter((e: any) => e.t === "release" && e.managerId === cityId);
-  for (const rel of cityReleases as any[]) {
-    expect(rel.playerId).not.toBe(bayernPlayer.id);
-    expect(rel.playerId).not.toBe(realPlayer.id);
-  }
+  expect(resolved.log.filter((e: any) => e.t === "release" && e.managerId === cityId)).toHaveLength(0);
 
   // Both connected clients observed this final state via real "state" broadcasts, not just the
   // server-side store — this is the whole point of the test.

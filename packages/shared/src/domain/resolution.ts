@@ -1,4 +1,4 @@
-import type { RoomState, Contest } from "./types.js";
+import type { RoomState, Contest, Manager } from "./types.js";
 import { OVERCOMMIT_FINE } from "./types.js";
 import { cost } from "./budget.js";
 import { dueContests } from "./close.js";
@@ -77,35 +77,49 @@ export function finalizeContest(s: RoomState, contestId: string, now: number): R
   return voided;
 }
 
-/** Resolve every due contest in close order, then repair deficits exactly once for the whole batch.
- *  Once the overall draft clock has elapsed AND nothing is left open (an active war still runs out
- *  its own anti-snipe timer first), the room closes on its own — the host button is only for
- *  ending things early. */
+/** Managers whose balance is below zero: their squad is worth more than their budget (a club that
+ *  started over budget, or one fined for overcommitting). Exactly zero is fine. */
+export function managersOverBudget(s: RoomState): Manager[] {
+  return Object.values(s.managers).filter((m) => m.spendable < 0);
+}
+
+/** Resolve every due contest in close order. Once the overall draft clock has elapsed AND nothing is
+ *  left open (an active war still runs out its own anti-snipe timer first) AND nobody is over budget,
+ *  the room closes on its own — the host button is only for ending things early.
+ *
+ *  Nobody's players are released for them: a manager in the red releases players themselves, and the
+ *  auction simply doesn't end (clock or no clock) until every balance is zero or better. */
 export function resolveDue(s: RoomState, now: number): RoomState {
   let state = s;
   for (const c of dueContests(state, now)) state = finalizeContest(state, c.id, now);
-  state = repairAll(state, now);
   const clockElapsed = state.status === "live" && state.startedAt !== null && now >= state.startedAt + state.draftClockMs;
   const nothingOpen = Object.values(state.contests).every(c => c.status !== "war" && c.status !== "listing");
-  if (clockElapsed && nothingOpen) state = { ...state, status: "closed" };
+  if (clockElapsed && nothingOpen && managersOverBudget(state).length === 0) state = { ...state, status: "closed" };
   return state;
 }
 
 /** The host manually ending the draft: force-resolve every open contest right now regardless of
  *  its own closesAt (unlike the natural clock, which lets an active war run out its own timer),
- *  then close the room. */
+ *  then close the room. Refused — with nothing changed — while anyone is below zero once those
+ *  contests are settled. */
 export function endDraftNow(s: RoomState, now: number): RoomState {
   let state = s;
   for (const c of Object.values(state.contests).filter(c => c.status === "war" || c.status === "listing")) {
     state = finalizeContest(state, c.id, now);
   }
-  state = repairAll(state, now);
+  const red = managersOverBudget(state);
+  if (red.length > 0) {
+    const who = red.map((m) => `${state.clubNames[m.clubId] ?? m.clubId} (${m.displayName})`).join(", ");
+    throw new Error(`can't end while ${who} ${red.length === 1 ? "is" : "are"} over budget — release players first`);
+  }
   return { ...state, status: "closed" };
 }
 
 /** Release the manager's own players (cheapest listed value first) until spendable >= 0.
  *  Never releases a player who is currently the subject of an open (unresolved) contest —
- *  a forced release must never contend with that contest's own war mechanics. */
+ *  a forced release must never contend with that contest's own war mechanics.
+ *  Only the season handoff uses this now (spec §4.9). Inside a draft nobody is released for
+ *  anyone: see managersOverBudget / resolveDue. */
 export function coverDeficit(s: RoomState, managerId: string, now: number): RoomState {
   let state = s;
   const contestedPlayerIds = () => new Set(
@@ -131,16 +145,6 @@ export function coverDeficit(s: RoomState, managerId: string, now: number): Room
       players: { ...state.players, [p.id]: { ...p, ownerId: null } },
       log: [...state.log, { t: "release", at: now, managerId, playerId: p.id, toValue: p.listedValue }],
     };
-  }
-  return state;
-}
-
-/** Repair every manager left with a negative balance (e.g. from the overcommit fine). */
-function repairAll(s: RoomState, now: number): RoomState {
-  let state = s;
-  for (const id of Object.keys(state.managers)) {
-    const m = state.managers[id];
-    if (m && m.spendable < 0) state = coverDeficit(state, id, now);
   }
   return state;
 }

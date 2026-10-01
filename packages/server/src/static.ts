@@ -6,7 +6,7 @@ const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon",
   ".woff2": "font/woff2", ".webp": "image/webp", ".txt": "text/plain; charset=utf-8",
-  ".webmanifest": "application/manifest+json",
+  ".webmanifest": "application/manifest+json", ".csv": "text/csv; charset=utf-8",
 };
 
 /** Serves the built web app (packages/web/dist) from the game server, so one port — and one public

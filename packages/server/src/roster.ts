@@ -17,6 +17,13 @@ function firstInitial(name: string): string {
   return normalizeForMatch(name).split(" ").filter(Boolean)[0]?.[0] ?? "";
 }
 
+/** A club name stripped of the filler words people drop or add ("Atlético de Madrid" / "Atlético Madrid" /
+ *  "Club Atlético Madrid", "FC Barcelona" / "Barcelona"), for the looser club test of the third try. */
+const CLUB_FILLER = new Set(["de", "fc", "cf", "afc", "club", "the"]);
+function looseClubKey(club: string): string {
+  return normalizeForMatch(club).split(" ").filter(t => t && !CLUB_FILLER.has(t)).join(" ");
+}
+
 interface CatalogIndex {
   /** catalog player id -> player, for a CSV row that names the exact FC26 id — bypasses name
    *  matching entirely, so there's no ambiguity risk (e.g. two "J. Silva"s, or a display name
@@ -30,6 +37,9 @@ interface CatalogIndex {
   /** "surname" -> every catalog entry ending in that surname, regardless of how much of the
    *  first name (or just an initial) precedes it — see `surnameKey`. */
   bySurname: Map<string, SeedPlayer[]>;
+  /** "looseClub|shirt number" -> every catalog entry wearing that number at that club, for the third try
+   *  (number + score) when neither the id nor the name found anybody. */
+  byClubNumber: Map<string, SeedPlayer[]>;
   /** normalized club name -> canonical spelling, so a loosely-typed club still displays nicely. */
   clubSpelling: Map<string, string>;
   /** normalized club name -> that club's average stats, for a player the database has never
@@ -56,6 +66,7 @@ function buildIndex(catalog: SeedPlayer[]): CatalogIndex {
   const bySurname = new Map<string, SeedPlayer[]>();
   const clubSpelling = new Map<string, string>();
   const byClub = new Map<string, SeedPlayer[]>();
+  const byClubNumber = new Map<string, SeedPlayer[]>();
   for (const p of catalog) {
     byId.set(p.id, p);
     byClubAndName.set(`${normalizeForMatch(p.club)}|${normalizeForMatch(p.name)}`, p);
@@ -66,29 +77,46 @@ function buildIndex(catalog: SeedPlayer[]): CatalogIndex {
     const clubKey = normalizeForMatch(p.club);
     clubSpelling.set(clubKey, p.club);
     (byClub.get(clubKey) ?? byClub.set(clubKey, []).get(clubKey)!).push(p);
+    if (p.clubNumber !== undefined) {
+      const numKey = `${looseClubKey(p.club)}|${p.clubNumber}`;
+      (byClubNumber.get(numKey) ?? byClubNumber.set(numKey, []).get(numKey)!).push(p);
+    }
   }
   const clubStats = new Map<string, ClubStats>();
   for (const [clubKey, players] of byClub) clubStats.set(clubKey, statsOf(players));
   const globalStats = statsOf(catalog);
-  return { byId, byClubAndName, byName, bySurname, clubSpelling, clubStats, globalStats };
+  return { byId, byClubAndName, byName, bySurname, byClubNumber, clubSpelling, clubStats, globalStats };
 }
 
-/** A player the database has never heard of at all — still gets seeded, using their stated
- *  club's average stats (or the whole database's average, if even that club is unknown). */
+/** What a player the database has never heard of is worth (€M) and how he's rated. These are reserve and
+ *  academy players the game's snapshot lacks, so they start cheap. They used to get their club's AVERAGE
+ *  value, which made six unknown Real Madrid reserves worth ~285M and pushed a real ~1411M squad over a
+ *  1500M budget. The host can set a real value and position in the CSV's 5th/6th columns. */
+export const UNKNOWN_PLAYER_VALUE = 0.5;
+export const UNKNOWN_PLAYER_OVERALL = 55;
+
+/** A player the database has never heard of at all — still gets seeded: cheap and unrated, playing the
+ *  position most of his club's squad plays (or the whole database's, if even that club is unknown). */
 function syntheticPlayer(index: CatalogIndex, clubRaw: string, playerRaw: string): SeedPlayer {
   const stats = index.clubStats.get(normalizeForMatch(clubRaw)) ?? index.globalStats;
   const name = playerRaw.trim();
   return {
     id: `custom-${slugifyClub(clubRaw)}-${slugifyClub(name)}`,
-    name, position: stats.commonPosition, value: stats.avgValue, overall: stats.avgOverall,
+    name, position: stats.commonPosition, value: UNKNOWN_PLAYER_VALUE, overall: UNKNOWN_PLAYER_OVERALL,
     club: clubRaw.trim(), clubId: null,
   };
 }
 
 /** Narrows a multi-candidate match down to one: prefer whoever's database club loosely matches
  *  what the host typed; otherwise just take the highest-value one. Never blocks the upload. */
-function resolveCandidates(candidates: SeedPlayer[], clubRaw: string): SeedPlayer {
+function resolveCandidates(candidates: SeedPlayer[], clubRaw: string, score?: number): SeedPlayer {
   if (candidates.length === 1) return candidates[0]!;
+  // A score is the most specific hint there is: if exactly the same-named players differ in rating, it names one.
+  if (score !== undefined) {
+    const sameRating = candidates.filter(c => c.overall === score);
+    if (sameRating.length === 1) return sameRating[0]!;
+    if (sameRating.length > 1) candidates = sameRating;
+  }
   const clubNorm = normalizeForMatch(clubRaw);
   const loose = candidates.filter(c => {
     const candidateClubNorm = normalizeForMatch(c.club);
@@ -109,24 +137,62 @@ function resolveCandidates(candidates: SeedPlayer[], clubRaw: string): SeedPlaye
  * miss the database. When the database has never heard of the name at all (either way), don't
  * block the upload either — seed them with their stated club's average stats instead.
  */
-function findPlayer(index: CatalogIndex, clubRaw: string, playerRaw: string): SeedPlayer {
+function findPlayer(index: CatalogIndex, clubRaw: string, playerRaw: string, score?: number, shirtNumber?: number): SeedPlayer {
+  const candidates = index.byName.get(normalizeForMatch(playerRaw));
+  // A score naming exactly one of several same-named players beats even an exact club match: players
+  // transfer, but a rating of 76 is never the 90-rated namesake.
+  if (score !== undefined && candidates && candidates.length > 1) {
+    const sameRating = candidates.filter(c => c.overall === score);
+    if (sameRating.length > 0) return resolveCandidates(sameRating, clubRaw, score);
+  }
+
   const exact = index.byClubAndName.get(`${normalizeForMatch(clubRaw)}|${normalizeForMatch(playerRaw)}`);
   if (exact) return exact;
 
-  const candidates = index.byName.get(normalizeForMatch(playerRaw));
-  if (candidates && candidates.length > 0) return resolveCandidates(candidates, clubRaw);
+  if (candidates && candidates.length > 0) return resolveCandidates(candidates, clubRaw, score);
 
   // A mononym catalog entry ("Carvajal", no initial at all) has nothing to compare against the
   // query's first-initial — surname agreement alone is enough for those.
   const surnameCandidates = (index.bySurname.get(surnameKey(playerRaw)) ?? [])
     .filter(c => normalizeForMatch(c.name).split(" ").filter(Boolean).length === 1
       || firstInitial(c.name) === firstInitial(playerRaw));
-  if (surnameCandidates.length > 0) return resolveCandidates(surnameCandidates, clubRaw);
+  if (surnameCandidates.length > 0) return resolveCandidates(surnameCandidates, clubRaw, score);
+
+  // Third try, for a name the database doesn't know (a first name alone, a nickname): same club, same shirt
+  // number AND same rating. Both are needed, and only a single fit counts — two fits is a guess.
+  if (shirtNumber !== undefined && score !== undefined) {
+    const fits = (index.byClubNumber.get(`${looseClubKey(clubRaw)}|${shirtNumber}`) ?? []).filter(c => c.overall === score);
+    if (fits.length === 1) return fits[0]!;
+  }
 
   return syntheticPlayer(index, clubRaw, playerRaw);
 }
 
 const KNOWN_POSITIONS: Position[] = ["GK", "DEF", "MID", "FWD"];
+
+type Col = "club" | "player" | "number" | "id" | "score" | "value" | "position";
+const COLUMN_NAMES: Record<string, Col> = {
+  club: "club", player: "player", name: "player", number: "number", no: "number", shirt: "number",
+  id: "id", score: "score", overall: "score", rating: "score", value: "value", position: "position", pos: "position",
+};
+/** Where each column sits in the file's rows. Files that name their extra columns (id, score, value,
+ *  position) in the header are read by name, in any order, and only the columns named are used. Older files
+ *  with a plain `club,player[,number]` header and unnamed extras keep the original positions: id, value,
+ *  position, then score. */
+const LEGACY_COLUMNS: Record<Col, number> = { club: 0, player: 1, number: 2, id: 3, value: 4, position: 5, score: 6 };
+function columnsFrom(header: string): Record<Col, number> {
+  const named: Partial<Record<Col, number>> = {};
+  parseCsvLine(header).forEach((h, i) => {
+    const col = COLUMN_NAMES[normalizeForMatch(h)];
+    if (col && named[col] === undefined) named[col] = i;
+  });
+  const usesNames = (["id", "score", "value", "position"] as Col[]).some(c => named[c] !== undefined);
+  if (!usesNames) return { ...LEGACY_COLUMNS };
+  return {
+    club: named.club ?? 0, player: named.player ?? 1,
+    number: named.number ?? -1, id: named.id ?? -1, score: named.score ?? -1, value: named.value ?? -1, position: named.position ?? -1,
+  };
+}
 
 /** Parses `club,player[,number[,id[,value[,position]]]]` data rows out of `lines` (index 0 is
  *  that block's own header row, so labeling starts at 2 — matches how these errors have always
@@ -148,15 +214,23 @@ const KNOWN_POSITIONS: Position[] = ["GK", "DEF", "MID", "FWD"];
 function parseClubPlayerRows(lines: string[], index: CatalogIndex, rowLabelPrefix: string): SeedPlayer[] {
   const seed: SeedPlayer[] = [];
   const errors: string[] = [];
+  const cols = columnsFrom(lines[0]!);
   for (let i = 1; i < lines.length; i++) {
     const rowLabel = `${rowLabelPrefix} ${i + 1}`;
-    const [clubRaw, playerRaw, numberRaw, idRaw, valueRaw, positionRaw] = parseCsvLine(lines[i]!);
+    const cells = parseCsvLine(lines[i]!);
+    const cell = (c: Col): string | undefined => (cols[c] >= 0 ? cells[cols[c]] : undefined);
+    const clubRaw = cell("club"), playerRaw = cell("player"), numberRaw = cell("number");
+    const idRaw = cell("id"), valueRaw = cell("value"), positionRaw = cell("position"), scoreRaw = cell("score");
     if (!clubRaw || !playerRaw) { errors.push(`${rowLabel}: missing club or player`); continue; }
 
-    const byId = idRaw && idRaw.trim() ? index.byId.get(idRaw.trim()) : undefined;
-    const match = byId ?? findPlayer(index, clubRaw, playerRaw);
-    const club = index.clubSpelling.get(normalizeForMatch(clubRaw)) ?? clubRaw.trim();
-    const clubId = slugifyClub(club);
+    // The score (FC26 overall rating, 1-99) names one of several same-named players, and rates a player
+    // the database has never heard of.
+    let score: number | undefined;
+    if (scoreRaw && scoreRaw.trim()) {
+      const n = Number(scoreRaw.trim());
+      if (!Number.isInteger(n) || n < 1 || n > 99) { errors.push(`${rowLabel}: bad score "${scoreRaw.trim()}" (a whole number from 1 to 99)`); continue; }
+      score = n;
+    }
 
     let shirtNumber: number | undefined;
     if (numberRaw && numberRaw.trim()) {
@@ -164,6 +238,11 @@ function parseClubPlayerRows(lines: string[], index: CatalogIndex, rowLabelPrefi
       if (!Number.isInteger(n) || n < 1) { errors.push(`${rowLabel}: bad shirt number "${numberRaw.trim()}"`); continue; }
       shirtNumber = n;
     }
+
+    const byId = idRaw && idRaw.trim() ? index.byId.get(idRaw.trim()) : undefined;
+    const match = byId ?? findPlayer(index, clubRaw, playerRaw, score, shirtNumber);
+    const club = index.clubSpelling.get(normalizeForMatch(clubRaw)) ?? clubRaw.trim();
+    const clubId = slugifyClub(club);
 
     let value = match.value;
     let position = match.position;
@@ -182,7 +261,7 @@ function parseClubPlayerRows(lines: string[], index: CatalogIndex, rowLabelPrefi
       position = pos;
     }
 
-    seed.push({ ...match, value, position, club, clubId, shirtNumber });
+    seed.push({ ...match, value, position, overall: isSynthetic && score !== undefined ? score : match.overall, club, clubId, shirtNumber });
   }
   if (errors.length > 0) throw new Error(errors.join("\n"));
   return seed;

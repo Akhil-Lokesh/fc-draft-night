@@ -73,6 +73,7 @@ export function Lobby({
         {declined && !asked && <p className="leave-no" role="status">The host asked you to stay.</p>}
         {myId && room.managers[myId] && <div className="lobby-voice"><VoiceControl code={room.code} myId={myId} /></div>}
         <p className="kicker">The tunnel · Season {room.seasonNumber}</p>
+        {room.testMode && <p className="test-chip" role="status">Test room</p>}
         <Brand size="md" />
       </header>
 
@@ -123,9 +124,15 @@ export function Lobby({
               {poolBuilder}
               <div className="kickoff rise">
                 <p className="hint">{poolCount} pool player{poolCount === 1 ? "" : "s"} · {managers.length} manager{managers.length === 1 ? "" : "s"} in</p>
-                {/* The server refuses to start a room with empty seats; mirror that so the host sees why. */}
-                <button className="btn btn-flare btn-lg btn-block" onClick={onStart} disabled={empties > 0}>
-                  {empties > 0 ? `Waiting for ${empties} more manager${empties === 1 ? "" : "s"}` : "Start the draft"}
+                {room.testMode && empties > 0 && (
+                  <p className="hint">Test room: the {empties} empty seat{empties === 1 ? "" : "s"} become practice managers you can switch between.</p>
+                )}
+                {/* The server refuses to start an ordinary room with empty seats; mirror that so the host sees why.
+                    A test room starts as it is. */}
+                <button className="btn btn-flare btn-lg btn-block" onClick={onStart} disabled={empties > 0 && !room.testMode}>
+                  {room.testMode
+                    ? "Start test draft"
+                    : empties > 0 ? `Waiting for ${empties} more manager${empties === 1 ? "" : "s"}` : "Start the draft"}
                 </button>
               </div>
             </>

@@ -11,7 +11,7 @@ import { Ticker } from "./timers.js";
 import { attachGateway } from "./gateway.js";
 import { Catalog } from "./catalog.js";
 import { publicState } from "./seats.js";
-import { loadSeed, type RoomState } from "@fcdn/shared";
+import type { RoomState } from "@fcdn/shared";
 
 const origin = process.env.WEB_ORIGIN;
 if (process.env.NODE_ENV === "production" && !origin) {
@@ -26,7 +26,7 @@ const io = new Server(http, { cors: { origin: origin ?? "*" } });
 const q = new Queue<RoomState>();
 const db = new Db(process.env.DB_PATH ?? "fcdn.sqlite");
 const catalog = new Catalog();
-const store = new RoomStore(q, db, loadSeed(), uniqueCode(db), catalog.raw());
+const store = new RoomStore(q, db, [], uniqueCode(db), catalog.raw()) /* no built-in teams: every room comes from an uploaded roster */;
 store.loadFrom(db); // crash recovery
 const clock = new RealClock();
 attachGateway(io, store, clock, catalog);

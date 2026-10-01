@@ -22,7 +22,7 @@ test("a room can be created from an uploaded roster naming any real club", async
 
   const csv = `club,player\n${chelseaPlayers.map(p => `Chelsea,${p.name}`).join("\n")}\nAtletico Madrid,J. Alvarez\n`;
   const created = new Promise<any>(res => a.once("created", res));
-  a.emit("create", { totalBudget: 300, rosterCsv: csv });
+  a.emit("create", { totalBudget: 1500, rosterCsv: csv });
   const { code } = await created;
   expect(code).toBeTruthy();
 
@@ -45,7 +45,7 @@ test("setPool rejects players from a club already claimed by a manager in this r
 
   const csv = "club,player\nChelsea,C. Palmer\nChelsea,M. Caicedo\nAtletico Madrid,J. Alvarez\n";
   const created = new Promise<any>(res => a.once("created", res));
-  a.emit("create", { totalBudget: 300, rosterCsv: csv });
+  a.emit("create", { totalBudget: 1500, rosterCsv: csv });
   const { code, hostKey } = await created;
 
   const joined = new Promise<any>(res => a.once("joined", res));
@@ -77,7 +77,7 @@ test("pool search hides players already in the room but finds everyone else, bui
   const a = client(url);
   const csv = "club,player\nChelsea,C. Palmer\nChelsea,M. Caicedo\nAtletico Madrid,J. Alvarez\n";
   const created = new Promise<any>(res => a.once("created", res));
-  a.emit("create", { totalBudget: 300, rosterCsv: csv });
+  a.emit("create", { totalBudget: 1500, rosterCsv: csv });
   const { code, hostKey } = await created;
   const joined = new Promise<any>(res => a.once("joined", res));
   a.emit("join", { code, displayName: "Ana", clubId: "chelsea", hostKey });
@@ -100,7 +100,7 @@ test("the host can put a built-in club's star into a roster room's pool", async 
   const a = client(url);
   const csv = "club,player\nChelsea,C. Palmer\nAtletico Madrid,J. Alvarez\n";
   const created = new Promise<any>(res => a.once("created", res));
-  a.emit("create", { totalBudget: 300, rosterCsv: csv });
+  a.emit("create", { totalBudget: 1500, rosterCsv: csv });
   const { code, hostKey } = await created;
   const joined = new Promise<any>(res => a.once("joined", res));
   a.emit("join", { code, displayName: "Ana", clubId: "chelsea", hostKey });

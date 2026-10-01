@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
-import { finalizeContest, resolveDue, endDraftNow } from "../domain/resolution.js";
-import { createRoom, addManager, OVERCOMMIT_FINE } from "../domain/types.js";
+import { finalizeContest, resolveDue, endDraftNow, managersOverBudget } from "../domain/resolution.js";
+import { createRoom, addManager, OVERCOMMIT_FINE, type RoomState } from "../domain/types.js";
 import { fixtureSeed } from "./fixtures/roster.js";
 
 function five(totalBudget = 600) {
@@ -156,4 +156,60 @@ test("an owner who successfully outbids a rival to KEEP their own listed player 
   expect((entry as any).managerId).toBe("real");
   expect(out.players["mbappe"]!.ownerId).toBe("real");
   expect(out.managers["real"]!.spendable).toBe(spendBefore - 20); // paid the 20 raise over listed value
+});
+
+/** Put a manager below zero the way a real squad worth more than its budget does. */
+function inTheRed(s: ReturnType<typeof five>, id = "real", by = 195.7): ReturnType<typeof five> {
+  const m = s.managers[id]!;
+  return { ...s, managers: { ...s.managers, [id]: { ...m, spendable: -by } } };
+}
+
+test("managersOverBudget lists exactly the managers below zero", () => {
+  const s = inTheRed(five());
+  expect(managersOverBudget(s).map(m => m.id)).toEqual(["real"]);
+  expect(managersOverBudget(five())).toEqual([]);
+  const zero = { ...s, managers: { ...s.managers, real: { ...s.managers["real"]!, spendable: 0 } } };
+  expect(managersOverBudget(zero)).toEqual([]); // exactly zero is fine: back in the black
+});
+
+test("the clock running out does NOT end the auction while a manager is below zero", () => {
+  const s = { ...inTheRed(five()), draftClockMs: 100 };
+  const late = resolveDue(s, 150); // long past the clock, nothing open
+  expect(late.status).toBe("live");
+  // they release players until they're back at zero ...
+  const m = late.managers["real"]!;
+  const cured = { ...late, managers: { ...late.managers, real: { ...m, spendable: 4.3 } } };
+  // ... and the very next tick ends it
+  expect(resolveDue(cured, 160).status).toBe("closed");
+});
+
+test("nobody's players are released for them: a manager in the red keeps their squad", () => {
+  const s = { ...inTheRed(five()), draftClockMs: 100 };
+  const owned = (st: RoomState) => Object.values(st.players).filter(p => p.ownerId === "real").length;
+  const before = owned(s);
+  const out = resolveDue(s, 150);
+  expect(owned(out)).toBe(before);
+  expect(out.log.filter(e => e.t === "release")).toHaveLength(0);
+  expect(out.managers["real"]!.spendable).toBe(-195.7); // still for them to fix
+});
+
+test("the host can't end the auction while a manager is below zero, and nothing changes", () => {
+  // "ars" is in the red and is not a party to the open contest below, so settling it can't cure him.
+  let s = inTheRed(five(), "ars");
+  const contest = { id: "c1", playerId: "mbappe", type: "war" as const, status: "war" as const, listerId: null,
+    quotes: [{ managerId: "bar", amount: 250, at: 10 }], quoteCounts: { bar: 1 }, closesAt: 999_999_999 };
+  s = { ...s, contests: { c1: contest } };
+  expect(() => endDraftNow(s, 20)).toThrow(/over budget/i);
+  expect(s.status).toBe("live");
+  expect(s.contests["c1"]!.status).toBe("war"); // not resolved behind the error's back
+});
+
+test("the error says who is over budget", () => {
+  const s = inTheRed(five(), "ars");
+  expect(() => endDraftNow(s, 20)).toThrow(/ars/i);
+});
+
+test("once everyone is at zero or above, the host can end it", () => {
+  const out = endDraftNow(five(), 20);
+  expect(out.status).toBe("closed");
 });

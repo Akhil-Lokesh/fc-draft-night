@@ -8,6 +8,7 @@ export interface StartConfig {
   squadSizeCap: number | null;
   capacity?: number;
   rosterCsv?: string;
+  testMode?: boolean;
 }
 
 /** Rough client-side count of distinct clubs in an uploaded roster — only sizes the "how many
@@ -36,15 +37,11 @@ const parseAmount = (raw: string): number => Number(raw.replace(/[^\d.]/g, ""));
 export function Setup({
   floor,
   onStart,
-  maxCapacity = 5,
   startLabel = "Start draft",
   onBack,
 }: {
   floor: number;
   onStart: (cfg: StartConfig) => void;
-  /** Kept for callers; the picker is sized from maxCapacity / the roster. */
-  managerCount?: number;
-  maxCapacity?: number;
   startLabel?: string;
   onBack?: () => void;
 }) {
@@ -53,15 +50,17 @@ export function Setup({
   const [cap, setCap] = useState("");
   const [rosterCsv, setRosterCsv] = useState<string | null>(null);
   const [rosterName, setRosterName] = useState<string | null>(null);
-  const [capacity, setCapacity] = useState(maxCapacity);
+  const [capacity, setCapacity] = useState(2);
+  const [testRoom, setTestRoom] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // One colour per manager: never more than MAX_MANAGERS, however many clubs a roster names.
-  const effectiveMax = Math.min(MAX_MANAGERS, rosterCsv ? Math.max(2, countClubs(rosterCsv)) : maxCapacity);
-  const capacityOptions = Array.from({ length: effectiveMax - 1 }, (_, i) => i + 2);
+  // There are no built-in teams: every club comes from the roster. One colour per manager, so never
+  // more than MAX_MANAGERS however many clubs it names.
+  const effectiveMax = rosterCsv ? Math.min(MAX_MANAGERS, Math.max(2, countClubs(rosterCsv))) : 0;
+  const capacityOptions = Array.from({ length: Math.max(0, effectiveMax - 1) }, (_, i) => i + 2);
 
   const onRosterFile = (file: File | undefined) => {
-    if (!file) { setRosterCsv(null); setRosterName(null); setCapacity(maxCapacity); return; }
+    if (!file) { setRosterCsv(null); setRosterName(null); setCapacity(2); return; }
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result ?? "");
@@ -73,9 +72,10 @@ export function Setup({
   };
 
   const start = () => {
+    if (!rosterCsv) return; // the button is disabled too; a room has no teams without a roster
     const total = parseAmount(budget);
     if (!Number.isFinite(total) || total < floor) {
-      setError(`Budget is below the floor (€${floor}M). The priciest real squad must fit.`);
+      setError(`Budget is below the floor (€${floor}M): a 5-star club needs at least that.`);
       return;
     }
     setError(null);
@@ -84,7 +84,8 @@ export function Setup({
       quoteTimerMs: timerMin * 60_000,
       squadSizeCap: cap.trim() ? parseAmount(cap) : null,
       capacity,
-      rosterCsv: rosterCsv ?? undefined,
+      rosterCsv,
+      testMode: testRoom || undefined,
     });
   };
 
@@ -104,14 +105,17 @@ export function Setup({
         <fieldset className="group">
           <legend className="group-legend"><span>01</span> Money</legend>
           <div className="field">
-            <label className="label" htmlFor="setup-budget">Total budget per manager (€M)</label>
+            <label className="label" htmlFor="setup-budget">Total budget for a 5-star club (€M)</label>
             <div className="input-money">
               <span aria-hidden="true">€</span>
               <input id="setup-budget" type="text" inputMode="decimal" className="input input-xl"
                 value={budget} onChange={(e) => setBudget(e.target.value)} />
               <span aria-hidden="true">M</span>
             </div>
-            <p className="hint">Floor €{floor}M. The priciest real squad has to fit.</p>
+            <p className="hint">
+              Minimum €{floor}M. Each half-star lower gets €150M less. A squad worth more than its club's budget starts
+              over budget, and that manager must release players before the auction can end.
+            </p>
           </div>
           <div className="field">
             <label className="label" htmlFor="setup-cap">Squad cap (optional)</label>
@@ -122,7 +126,7 @@ export function Setup({
         <fieldset className="group">
           <legend className="group-legend"><span>02</span> Clubs</legend>
           <div className="field">
-            <label className="label" htmlFor="setup-roster">Upload a roster (optional)</label>
+            <label className="label" htmlFor="setup-roster">Upload your roster</label>
             <label className={`drop ${rosterName ? "is-loaded" : ""}`}>
               <input id="setup-roster" type="file" accept=".csv,text/csv" className="drop-input"
                 onChange={(e) => onRosterFile(e.target.files?.[0])} />
@@ -130,17 +134,20 @@ export function Setup({
               <span className="hint">
                 {rosterName
                   ? `${effectiveMax} club(s) found. Every player is cross-checked against the FC26 database.`
-                  : "\"club,player\" rows, any real FC26 club. Skip this to play the built-in 5."}
+                  : "Your teams and squads come only from this file: \"club,player\" rows, any real FC26 club."}
               </span>
             </label>
+            <p className="hint"><a href="/roster-template.csv" download>Download the roster template</a> to see the format.</p>
           </div>
-          <div className="field">
-            <label className="label" htmlFor="setup-capacity">How many managers?</label>
-            <select id="setup-capacity" className="input" value={capacity} onChange={(e) => setCapacity(Number(e.target.value))}>
-              {capacityOptions.map((n) => <option key={n} value={n}>{n} managers</option>)}
-            </select>
-            <p className="hint">One real club per manager. No duplicates.</p>
-          </div>
+          {rosterCsv && (
+            <div className="field">
+              <label className="label" htmlFor="setup-capacity">How many managers?</label>
+              <select id="setup-capacity" className="input" value={capacity} onChange={(e) => setCapacity(Number(e.target.value))}>
+                {capacityOptions.map((n) => <option key={n} value={n}>{n} managers</option>)}
+              </select>
+              <p className="hint">One real club per manager. No duplicates.</p>
+            </div>
+          )}
         </fieldset>
 
         <fieldset className="group">
@@ -159,10 +166,22 @@ export function Setup({
           </div>
         </fieldset>
 
+        <fieldset className="group">
+          <legend className="group-legend"><span>04</span> Testing</legend>
+          <label className="check">
+            <input type="checkbox" checked={testRoom} onChange={(e) => setTestRoom(e.target.checked)} />
+            <span>
+              <b>Test room</b>
+              <span className="hint">Start alone and play every seat yourself. Empty seats become practice managers you can switch between during the draft.</span>
+            </span>
+          </label>
+        </fieldset>
+
         {error && <div className="inline-error" role="alert">{error}</div>}
 
+        {!rosterCsv && <p className="hint center">Upload a roster to create a room: every team and player comes from your file.</p>}
         <p className="hint center">Next you get a room code to share, then pick your own name and club.</p>
-        <button type="submit" className="btn btn-flare btn-lg btn-block">{startLabel}</button>
+        <button type="submit" className="btn btn-flare btn-lg btn-block" disabled={!rosterCsv}>{startLabel}</button>
       </form>
     </div>
   );

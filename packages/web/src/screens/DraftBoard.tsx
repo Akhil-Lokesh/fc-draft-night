@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { LISTING_MS, type RoomState } from "@fcdn/shared";
+import { LISTING_MS, managersOverBudget, type RoomState } from "@fcdn/shared";
 import { isOpen, isWin, leaderOf, splitMySquad, threatsFor, warSides, windowFor } from "../lib/board.js";
 import { mmss, money } from "../lib/format.js";
 import { useClubLabel } from "../lib/clubs.js";
@@ -31,6 +31,7 @@ export function DraftBoard({
   actions,
   iAmHost,
   onEndDraft,
+  seatSwitcher,
 }: {
   room: RoomState;
   myId: string;
@@ -39,6 +40,8 @@ export function DraftBoard({
   /** Only the host can end the auction. */
   iAmHost?: boolean;
   onEndDraft?: () => void;
+  /** Test rooms, host only: lets one person play every seat. `myId` is the seat being played. */
+  seatSwitcher?: { onSwitch: (managerId: string) => void };
   /** Walk away from this room back to the home screen — the only way out mid-draft. */
 }) {
   const label = useClubLabel();
@@ -56,6 +59,11 @@ export function DraftBoard({
   const squad = splitMySquad(room, myId);
   const threatCount = threatsFor(room, myId).length;
   const clockLeft = (room.startedAt ?? 0) + room.draftClockMs - now;
+  // Nobody is released for anyone: a manager below zero releases players themselves, and the auction
+  // (clock or host button) cannot end until every balance is zero or better.
+  const red = managersOverBudget(room);
+  const iAmRed = !!me && me.spendable < 0;
+  const overtime = clockLeft <= 0;
   const lotNo = (id: string) => Object.keys(room.contests).indexOf(id) + 1;
 
   const nav: { id: Pane; label: string; badge?: number; hot?: boolean }[] = [
@@ -72,13 +80,13 @@ export function DraftBoard({
         <div className="bar-clock">
           <span className="live-dot" aria-hidden="true" />
           <span className="bar-label">Deadline</span>
-          <Flap size="md" tone={clockLeft <= 60_000 ? "hot" : undefined} label="draft clock">{mmss(clockLeft)}</Flap>
+          <Flap size="md" tone={clockLeft <= 60_000 ? "hot" : undefined} label="draft clock">{overtime ? "OVERTIME" : mmss(clockLeft)}</Flap>
         </div>
         {me && (
           <div className="bar-me">
             <Crest clubId={me.clubId} size={24} />
             <span className="bar-label">{label(me.clubId)}</span>
-            <Flap size="md" tone="win" label="your spendable budget">{money(me.spendable)}</Flap>
+            <Flap size="md" tone={iAmRed ? "hot" : "win"} label="your spendable budget">{money(me.spendable)}</Flap>
           </div>
         )}
         <VoiceControl code={room.code} myId={myId} />
@@ -86,11 +94,17 @@ export function DraftBoard({
           <div className="bar-host">
             {confirmEnd ? (
               <>
-                <button className="btn btn-hot btn-sm" onClick={() => { setConfirmEnd(false); onEndDraft?.(); }}>Confirm end</button>
+                <button className="btn btn-hot btn-sm" disabled={red.length > 0} onClick={() => { setConfirmEnd(false); onEndDraft?.(); }}>Confirm end</button>
                 <button className="btn btn-ghost btn-sm" onClick={() => setConfirmEnd(false)}>Keep going</button>
               </>
             ) : (
-              <button className="btn btn-ghost btn-sm btn-danger" aria-label="End auction" onClick={() => setConfirmEnd(true)}>
+              <button
+                className="btn btn-ghost btn-sm btn-danger"
+                aria-label="End auction"
+                disabled={red.length > 0}
+                title={red.length > 0 ? `Can't end while ${red.length} manager${red.length === 1 ? " is" : "s are"} over budget` : undefined}
+                onClick={() => setConfirmEnd(true)}
+              >
                 End<span className="bar-long"> auction</span>
               </button>
             )}
@@ -98,8 +112,35 @@ export function DraftBoard({
         )}
       </header>
 
+      {room.testMode && seatSwitcher && (
+        <div className="testbar">
+          <span className="test-chip">Test room</span>
+          <label className="testbar-pick">
+            <span>Playing as</span>
+            <select className="input" aria-label="Playing as" value={myId} onChange={(e) => seatSwitcher.onSwitch(e.target.value)}>
+              {Object.values(room.managers)
+                .sort((x, y) => label(x.clubId).localeCompare(label(y.clubId)))
+                .map((m) => (
+                  <option key={m.id} value={m.id}>{label(m.clubId)} · {m.displayName}{m.practice ? " (practice)" : ""}</option>
+                ))}
+            </select>
+          </label>
+        </div>
+      )}
+
       <Ticker log={room.log} players={room.players} managers={room.managers} />
       <ThreatBanner room={room} myId={myId} onDefend={actions.bid} />
+      {red.length > 0 && (
+        <div className="redbar" role="status" aria-label="Over budget">
+          {iAmRed && me && (
+            <p><b>You're {money(-me.spendable)} over budget.</b> Release players from your squad until you're back at zero.</p>
+          )}
+          <p>
+            The auction can't end until everyone is at zero or better{overtime ? ", even though the clock has run out" : ""}.
+            Over budget: {red.map((m) => `${label(m.clubId)} (${m.displayName}) ${money(-m.spendable)}`).join(", ")}.
+          </p>
+        </div>
+      )}
 
       <div className="board-grid">
         <div className="pane pane-squad" data-for="squad">

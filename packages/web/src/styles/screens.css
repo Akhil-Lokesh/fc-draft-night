@@ -357,3 +357,14 @@
 }
 .leave-ask p { margin: 0; color: var(--chalk); }
 .leave-ask-actions { display: flex; gap: 8px; }
+
+/* ── test room ────────────────────────────────────────────── */
+.test-chip {
+  align-self: flex-start; display: inline-block; margin: 0;
+  font: 700 11px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 5px 9px; border-radius: 999px; color: var(--flare-ink); background: var(--flare);
+}
+.check { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; padding-bottom: 14px; }
+.check input { flex: none; width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--flare); }
+.check b { display: block; font-size: 15px; }
+.check .hint { display: block; margin-top: 2px; }

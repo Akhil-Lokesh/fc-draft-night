@@ -7,9 +7,9 @@ export function positionLabel(p: { position: string; positionDetail?: string; al
 
 /** Money in millions: whole numbers bare, otherwise one decimal. The "€" glyph is a CSS ::before. */
 export function money(n: number): string {
-  const r = Math.round(n * 10) / 10;
+  const r = Math.round(Math.abs(n) * 10) / 10;
   const s = Number.isInteger(r) ? String(r) : r.toFixed(1);
-  return `${s}M`;
+  return `${n < 0 && r !== 0 ? "\u2212" : ""}${s}M`; // a real minus sign for amounts below zero
 }
 
 /** Remaining time as m:ss, clamped at zero (a closed contest reads 0:00, never negative). */

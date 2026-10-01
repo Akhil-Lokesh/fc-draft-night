@@ -4,7 +4,6 @@ import { useClubLabel } from "../lib/clubs.js";
 import { Crest, Money, useClubVars } from "../ui/primitives.js";
 import { VoiceRing } from "./Voice.js";
 
-const LOW = 0.12; // share of the total budget below which a manager reads as running low
 
 /** League-table view of the room: who has money left, and how many of my challenges against
  *  each rival I've already burned. */
@@ -31,7 +30,8 @@ export function Standings({
       <tbody>
         {rows.map((m, i) => {
           const frac = totalBudget > 0 ? Math.max(0, Math.min(1, m.spendable / totalBudget)) : 0;
-          const low = m.spendable <= totalBudget * LOW;
+          const neg = m.spendable < 0;
+          const tone = neg ? "is-neg" : "";
           const me = m.id === myId;
           const used = challenges[`${myId}->${m.id}`] ?? 0;
           return (
@@ -45,9 +45,9 @@ export function Standings({
                     <small>{label(m.clubId)}</small>
                   </span>
                 </div>
-                <div className="t-bar"><i className={low ? "is-low" : ""} style={{ width: `${frac * 100}%` }} /></div>
+                <div className="t-bar"><i className={tone} style={{ width: `${frac * 100}%` }} /></div>
               </td>
-              <td className={`num ${low ? "is-low" : ""}`}><Money n={m.spendable} /></td>
+              <td className={`num ${tone}`}><Money n={m.spendable} /></td>
               <td className="num">
                 {me ? <span className="dim">–</span> : (
                   <span className={`pips ${used >= CHALLENGE_CAP ? "is-max" : ""}`} aria-label={`${used} of ${CHALLENGE_CAP} challenges used`}>

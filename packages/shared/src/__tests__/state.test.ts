@@ -27,6 +27,11 @@ test("adding a manager never takes a player another manager already owns", () =>
   expect(s.managers["m_real"]!.reserved).toBe(rest); // and his value isn't reserved against the newcomer
 });
 
+test("a room is a normal room unless it's created as a test room", () => {
+  expect(createRoom({ code: "ABCD", totalBudget: 600, seed: fixtureSeed() }).testMode).toBeFalsy();
+  expect(createRoom({ code: "ABCD", totalBudget: 600, seed: fixtureSeed(), testMode: true }).testMode).toBe(true);
+});
+
 test("createRoom defaults capacity to 5 and honors an explicit capacity", () => {
   const s = createRoom({ code: "ABCD", totalBudget: 600, seed: fixtureSeed() });
   expect(s.capacity).toBe(5);
