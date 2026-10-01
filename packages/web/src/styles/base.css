@@ -7,6 +7,8 @@
 :root {
   --night: #060a07;
   --pitch: #0a120d;
+  --stripe-dark: #050a06;
+  --stripe-light: rgba(60, 150, 85, 0.10); /* light-green stripe at 10% over the dark base */
   --sheet: #0e1812;
   --sheet-2: #132019;
   --sheet-3: #1a2a21;
@@ -44,27 +46,11 @@ body {
   min-height: 100dvh;
   font: 15px/1.5 var(--body);
   color: var(--chalk);
-  background-color: var(--night);
-  /* mown stripes under two floodlight pools */
-  background-image:
-    radial-gradient(70vw 60vh at 8% -10%, rgba(255, 244, 200, 0.075), transparent 60%),
-    radial-gradient(70vw 60vh at 92% -10%, rgba(255, 244, 200, 0.06), transparent 60%),
-    repeating-linear-gradient(90deg, rgba(120, 180, 120, 0.028) 0 90px, transparent 90px 180px),
-    linear-gradient(180deg, var(--pitch), var(--night) 70%);
+  background-color: var(--stripe-dark);
+  /* mown pitch: plain dark-green / light-green stripes, nothing else */
+  background-image: repeating-linear-gradient(90deg, transparent 0 90px, var(--stripe-light) 90px 180px);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
-}
-
-/* film grain */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 100;
-  opacity: 0.07;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 button, input, select { font: inherit; color: inherit; }
@@ -179,7 +165,8 @@ h1, h2, h3, h4, p { margin: 0; }
 .club-tag-club { color: var(--dim); font-size: 12px; }
 
 .pos {
-  display: inline-block;
+  /* inline-flex + centring: in a row with taller pills the chip gets stretched, and its text must stay centred */
+  display: inline-flex; align-items: center; justify-content: center;
   font: 600 10px/1 var(--mono);
   letter-spacing: 0.06em;
   padding: 4px 6px;
@@ -190,8 +177,8 @@ h1, h2, h3, h4, p { margin: 0; }
   white-space: nowrap;
 }
 .tag {
-  display: inline-block;
-  font-size: 12px;
+  display: inline-flex; align-items: center;
+  font-size: 12px; line-height: 1;
   padding: 3px 8px;
   border-radius: 999px;
   color: var(--flare);

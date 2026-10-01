@@ -1,9 +1,17 @@
 import type { RoomState, Contest } from "./types.js";
 import { hasOpenContest } from "./types.js";
-import { canAfford } from "./budget.js";
 import { finalizeContest } from "./resolution.js";
 
 export class BidError extends Error {}
+
+/** How long a war waits after a REPLY. The war's opening bid (a challenge, or the first bid on a listing)
+ *  gets the host's full quote timer so the other side has time to notice and answer; every quote after
+ *  that only needs 2 minutes, or a five-way war on one player could run past half an hour. */
+export const REQUOTE_MS = 120_000;
+
+// No "can I afford it?" check at bid time: a manager may bid more than their balance (or bid on several
+// players whose total is more than it). Money is only checked when a war closes — finalizeContest voids a
+// win the winner can't pay for, fines them OVERCOMMIT_FINE, and passes the player to the runner-up.
 
 /** Challenge a player currently owned by someone else. Opens directly as a live war — no 2-minute listing phase. */
 export function openChallenge(
@@ -19,7 +27,6 @@ export function openChallenge(
   // second, independently-resolving contest for the same player.
   if (hasOpenContest(s, a.playerId)) throw new BidError("player already has an open contest");
   if (a.amount <= player.listedValue) throw new BidError("bid must exceed current listed value");
-  if (!canAfford(manager, player, a.amount)) throw new BidError("cannot afford");
   const id = `c${s.seq + 1}`;
   const contest: Contest = {
     id, playerId: a.playerId, type: "war", status: "war",
@@ -53,7 +60,6 @@ export function placeBid(
   const used = c.quoteCounts[a.managerId] ?? 0;
   if (used >= 2) throw new BidError("quote cap reached");
   if (a.amount <= player.listedValue) throw new BidError("bid must exceed current listed value");
-  if (!canAfford(manager, player, a.amount)) throw new BidError("cannot afford");
   const top = c.quotes.at(-1);
   if (top && a.amount <= top.amount) throw new BidError("bid must exceed current top bid");
 
@@ -75,7 +81,9 @@ export function placeBid(
     status: "war",
     quotes: [...c.quotes, { managerId: a.managerId, amount: a.amount, at: a.now }],
     quoteCounts,
-    closesAt: a.now + s.quoteTimerMs, // anti-snipe: reset off every new quote
+    // anti-snipe: every new quote resets the clock — the full timer for the bid that opens the war
+    // (on a listing), 2 minutes for each reply after it (never longer than the host's own timer)
+    closesAt: a.now + (c.status === "listing" ? s.quoteTimerMs : Math.min(s.quoteTimerMs, REQUOTE_MS)),
   };
   return {
     ...s,

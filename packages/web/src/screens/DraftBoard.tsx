@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { LISTING_MS, managersOverBudget, type RoomState } from "@fcdn/shared";
-import { isOpen, isWin, leaderOf, splitMySquad, threatsFor, warSides, windowFor } from "../lib/board.js";
+import { BLOCK_PAGE_SIZE, blockMatches, isOpen, isWin, leaderOf, splitMySquad, threatsFor, warSides, windowFor, type BlockFilter } from "../lib/board.js";
+import { useShortlist } from "../lib/shortlist.js";
 import { mmss, money } from "../lib/format.js";
 import { useClubLabel } from "../lib/clubs.js";
 import { Brand, Crest, Flap, Section } from "../ui/primitives.js";
@@ -23,6 +24,13 @@ export interface BoardActions {
 
 type Pane = "live" | "market" | "squad" | "room";
 type FeedTab = "history" | "sold" | "squads";
+
+const BLOCK_FILTERS: { id: BlockFilter; label: string; empty: string }[] = [
+  { id: "all", label: "All", empty: "No live lots." },
+  { id: "shortlist", label: "Shortlist", empty: "Nothing on your shortlist. Tap ☆ on a lot to keep an eye on it." },
+  { id: "defending", label: "Defending", empty: "Nobody is bidding on your players right now." },
+  { id: "mine", label: "My bids", empty: "You haven't bid on any live lot." },
+];
 
 export function DraftBoard({
   room,
@@ -48,13 +56,22 @@ export function DraftBoard({
   const [pane, setPane] = useState<Pane>("live");
   const [feedTab, setFeedTab] = useState<FeedTab>("history");
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [blockFilter, setBlockFilter] = useState<BlockFilter>("all");
+  const [blockPage, setBlockPage] = useState(0);
+  const shortlist = useShortlist(room.code, myId);
 
   const me = room.managers[myId];
-  // Newest lot first so fresh action lands at the top.
+  // Oldest lot first, so the block reads in the order things started and new lots spill onto later pages.
   const lots = useMemo(
-    () => Object.values(room.contests).filter(isOpen).sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true })),
+    () => Object.values(room.contests).filter(isOpen).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })),
     [room.contests],
   );
+  const filterCount = (f: BlockFilter) => lots.filter((c) => blockMatches(c, room, myId, shortlist.ids, f)).length;
+  const shown = lots.filter((c) => blockMatches(c, room, myId, shortlist.ids, blockFilter));
+  const pages = Math.max(1, Math.ceil(shown.length / BLOCK_PAGE_SIZE));
+  const page = Math.min(blockPage, pages - 1); // lots closing can shrink the last page away
+  const pageLots = shown.slice(page * BLOCK_PAGE_SIZE, (page + 1) * BLOCK_PAGE_SIZE);
+  const pickFilter = (f: BlockFilter) => { setBlockFilter(f); setBlockPage(0); };
   const inAuction = useMemo(() => new Set(lots.map((c) => c.playerId)), [lots]);
   const squad = splitMySquad(room, myId);
   const threatCount = threatsFor(room, myId).length;
@@ -158,8 +175,19 @@ export function DraftBoard({
                 <button className="btn btn-chalk btn-sm pane-jump" onClick={() => setPane("market")}>Open the market</button>
               </div>
             ) : (
+              <>
+              <div className="chips block-filters" role="group" aria-label="Filter the block">
+                {BLOCK_FILTERS.map((f) => (
+                  <button key={f.id} type="button" className={`chip ${blockFilter === f.id ? "is-on" : ""}`} aria-pressed={blockFilter === f.id} onClick={() => pickFilter(f.id)}>
+                    {f.label}<i className="chip-n">{filterCount(f.id)}</i>
+                  </button>
+                ))}
+              </div>
+              {pageLots.length === 0 ? (
+                <div className="quiet"><p>{BLOCK_FILTERS.find((f) => f.id === blockFilter)!.empty}</p></div>
+              ) : (
               <div className="lots">
-                {lots.map((c) => {
+                {pageLots.map((c) => {
                   const player = room.players[c.playerId];
                   if (!player) return null;
                   return (
@@ -176,10 +204,21 @@ export function DraftBoard({
                       sides={warSides(c, room, myId)}
                       windowMs={windowFor(c, room.quoteTimerMs, LISTING_MS)}
                       lotNo={lotNo(c.id)}
+                      shortlisted={shortlist.ids.has(c.id)}
+                      onShortlist={shortlist.toggle}
                     />
                   );
                 })}
               </div>
+              )}
+              {pages > 1 && (
+                <nav className="pager" aria-label="Block pages">
+                  <button type="button" className="btn btn-ghost btn-sm" aria-label="Previous page" disabled={page === 0} onClick={() => setBlockPage(page - 1)}>‹ Prev</button>
+                  <span className="pager-at">Page {page + 1} of {pages}</span>
+                  <button type="button" className="btn btn-ghost btn-sm" aria-label="Next page" disabled={page >= pages - 1} onClick={() => setBlockPage(page + 1)}>Next ›</button>
+                </nav>
+              )}
+              </>
             )}
           </Section>
         </div>

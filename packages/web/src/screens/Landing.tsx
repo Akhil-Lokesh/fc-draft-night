@@ -8,7 +8,7 @@ const LAWS: { title: string; body: React.ReactNode }[] = [
   { title: "Challenges", body: "Go after a rival's player by bidding above his listed value. That starts a bidding war." },
   { title: "Quote cap", body: <>Each manager gets <b>{QUOTE_CAP} raises</b> per war. Spend them wisely.</> },
   { title: "Rival cap", body: <>You can challenge the same rival <b>{CHALLENGE_CAP} times</b> across the whole draft.</> },
-  { title: "The clock", body: "Every war runs its own countdown that resets on each new bid. No last-second sniping." },
+  { title: "The clock", body: "A challenge gives the other side the full quote timer to answer. After that, every new bid resets the war to 2 minutes. No last-second sniping, no half-hour wars." },
   { title: "Overcommit", body: <>Win more than you can cover and it's a <b>{OVERCOMMIT_FINE}M fine</b>. The player goes to the next-best bidder or back to his old owner.</> },
   { title: "Locked in", body: "Win or successfully defend a player and he's locked for the season. No releasing him back." },
   { title: "In the black", body: "The auction can't end while anyone is over budget, even when the clock runs out. If your squad is worth more than your budget, release players until you're back at zero." },
@@ -18,17 +18,12 @@ const LAWS: { title: string; body: React.ReactNode }[] = [
 export function Landing({ onHost, onJoin }: { onHost: () => void; onJoin: () => void }) {
   return (
     <div className="page page-landing">
-      <div className="floodlights" aria-hidden="true" />
       <header className="hero">
         <h1 className="sr-only">FC Draft Night</h1>
-        {/* Two deliberate lines on a phone instead of wherever the text happens to wrap. */}
-        <p className="kicker hero-kicker rise">
-          <span>Live transfer-market draft</span><span className="hero-kicker-dot" aria-hidden="true"> · </span><span>for 2 or more managers</span>
-        </p>
-        <div className="rise" style={{ animationDelay: "60ms" }}><Brand size="xl" /></div>
-        <p className="hero-lede rise" style={{ animationDelay: "120ms" }}>
-          One budget each. Real squads. Bid, challenge and poach your way to the best XI before the deadline.
-        </p>
+        <div className="hero-brand rise" style={{ animationDelay: "60ms" }}>
+          <Brand size="xl" />
+          <p className="hero-tag"><span>Your club</span><i aria-hidden="true" /><span>Your budget</span><i aria-hidden="true" /><span>Your XI</span></p>
+        </div>
         <div className="hero-actions rise" style={{ animationDelay: "180ms" }}>
           <button className="btn btn-flare btn-lg" onClick={onHost}>Host a draft</button>
           <button className="btn btn-chalk btn-lg" onClick={onJoin}>Join with a code</button>

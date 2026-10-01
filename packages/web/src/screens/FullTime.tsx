@@ -33,11 +33,10 @@ export function FullTime({
 
   return (
     <div className="page page-wide">
-      <div className="floodlights" aria-hidden="true" />
-      <header className="page-head ft-head rise">
-        <div>
-          <p className="kicker">Draft complete · Season {room.seasonNumber}</p>
-          <Brand size="md" tagline="Full time" />
+      <header className="ft-head rise">
+        <div className="hero-brand">
+          <Brand size="xl" />
+          <p className="hero-tag"><span>Full time</span><i aria-hidden="true" /><span>Season {room.seasonNumber}</span></p>
         </div>
         <div className="ft-actions">
           <button className="btn btn-chalk" onClick={onExport}>Export season CSV</button>

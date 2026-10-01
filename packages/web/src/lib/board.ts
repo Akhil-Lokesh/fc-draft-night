@@ -1,4 +1,4 @@
-import type { Contest, LogEntry, Manager, Player, RoomState } from "@fcdn/shared";
+import { REQUOTE_MS, type Contest, type LogEntry, type Manager, type Player, type RoomState } from "@fcdn/shared";
 
 export const QUOTE_CAP = 2;
 export const CHALLENGE_CAP = 3;
@@ -130,8 +130,29 @@ export function splitMySquad(room: RoomState, myId: string) {
   return { listed, starting, acquired, sold };
 }
 
-/** The window a contest runs over, for the draining countdown bar. Wars reset to the quote timer
- *  on each bid; listings run the fixed 2-minute window. */
+/** The window a contest runs over, for the draining countdown bar. Listings run the fixed 2-minute
+ *  window. A war's opening bid (the challenge, or the first bid on a listing after its seed quote) gets
+ *  the full quote timer; every reply after it resets to 2 minutes (never longer than the quote timer). */
 export function windowFor(c: Contest, quoteTimerMs: number, listingMs: number): number {
-  return c.status === "listing" ? listingMs : quoteTimerMs;
+  if (c.status === "listing") return listingMs;
+  const openingQuotes = c.type === "war" ? 1 : 2;
+  return c.quotes.length <= openingQuotes ? quoteTimerMs : Math.min(quoteTimerMs, REQUOTE_MS);
+}
+
+/** On the block, a page holds this many lots; older lots come first, so newer ones spill onto page 2+. */
+export const BLOCK_PAGE_SIZE = 9;
+
+/** The block's filters: every live lot, the ones I've shortlisted, wars on my own players that rivals are
+ *  bidding on, and lots I've quoted in myself. */
+export type BlockFilter = "all" | "shortlist" | "defending" | "mine";
+
+export function blockMatches(
+  c: Contest, room: Pick<RoomState, "players">, myId: string, shortlist: ReadonlySet<string>, filter: BlockFilter,
+): boolean {
+  switch (filter) {
+    case "all": return true;
+    case "shortlist": return shortlist.has(c.id);
+    case "defending": return room.players[c.playerId]?.ownerId === myId && c.quotes.some((q) => q.managerId !== myId);
+    case "mine": return c.quotes.some((q) => q.managerId === myId);
+  }
 }

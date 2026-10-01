@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import { crestUrl } from "../lib/crests.js";
 import { clubColor, clubShort, useClubColor, useClubLabel, useClubNames } from "../lib/clubs.js";
 import { money } from "../lib/format.js";
@@ -94,10 +94,11 @@ export function Pos({ children }: { children: ReactNode }) {
 }
 
 export function Section({ title, aside, children, className = "", id }: { title: ReactNode; aside?: ReactNode; children: ReactNode; className?: string; id?: string }) {
+  const titleId = useId();
   return (
-    <section className={`sheet ${className}`} id={id}>
+    <section className={`sheet ${className}`} id={id} aria-labelledby={titleId}>
       <header className="sheet-head">
-        <h2 className="sheet-title">{title}</h2>
+        <h2 className="sheet-title" id={titleId}>{title}</h2>
         {aside && <div className="sheet-aside">{aside}</div>}
       </header>
       {children}

@@ -20,6 +20,8 @@ export function LotCard({
   windowMs,
   lotNo,
   sides,
+  shortlisted,
+  onShortlist,
 }: {
   contest: Contest;
   player: Player;
@@ -36,6 +38,9 @@ export function LotCard({
   lotNo?: number;
   /** A war's two teams — me on the left when I'm in it — each drawn in their team colour. */
   sides?: { left: WarSide; right: WarSide } | null;
+  /** On my shortlist? The star in the corner adds or removes it. */
+  shortlisted?: boolean;
+  onShortlist?: (contestId: string) => void;
 }) {
   const label = useClubLabel();
   const clubVars = useClubVars();
@@ -83,6 +88,18 @@ export function LotCard({
         <span className="lot-no">{lotNo ? `Lot ${String(lotNo).padStart(2, "0")}` : "Lot"}</span>
         <span className={`lot-kind ${isListing ? "" : "is-war"}`}>{isListing ? "Listing" : "War"}</span>
         <Flap size="sm" tone={urgent ? "hot" : undefined} label="time left">{mmss(remaining)}</Flap>
+        {onShortlist && (
+          <button
+            type="button"
+            className={`lot-star ${shortlisted ? "is-on" : ""}`}
+            aria-pressed={!!shortlisted}
+            aria-label={shortlisted ? "Remove from shortlist" : "Add to shortlist"}
+            title={shortlisted ? "On your shortlist" : "Add to your shortlist"}
+            onClick={() => onShortlist(contest.id)}
+          >
+            {shortlisted ? "★" : "☆"}
+          </button>
+        )}
       </header>
       {drain !== null && <div className="lot-drain" aria-hidden="true"><i style={{ transform: `scaleX(${drain})` }} /></div>}
 
@@ -118,21 +135,24 @@ export function LotCard({
 
       <div className="lot-price">
         <Flap size="lg" tone={iLead ? "win" : undefined}>{money(topBid)}</Flap>
-        {leader ? (
-          <div className="lot-leader">
-            <span className="lot-leader-label">Leading</span>
-            <span className="lot-leader-team">
-              <Crest clubId={leader.clubId} size={18} />
-              {label(leader.clubId)} <span className="lot-leader-mgr">({leader.displayName})</span>
-            </span>
-          </div>
-        ) : (
-          <div className="lot-leader"><span className="lot-leader-label">Open listing · no bids yet</span></div>
+        {/* A war's VS strip already shows who leads; only a listing needs this beside the price. */}
+        {!sides && (
+          leader ? (
+            <div className="lot-leader">
+              <span className="lot-leader-label">Leading</span>
+              <span className="lot-leader-team">
+                <Crest clubId={leader.clubId} size={16} />
+                {label(leader.clubId)} <span className="lot-leader-mgr">({leader.displayName})</span>
+              </span>
+            </div>
+          ) : (
+            <div className="lot-leader"><span className="lot-leader-label">Open listing · no bids yet</span></div>
+          )
         )}
       </div>
 
       <div className="lot-bid">
-        <label className="bid-caption" htmlFor={`bid-${contest.id}`}>Your price · tap to type any amount, or use a step</label>
+        <label className="bid-caption" htmlFor={`bid-${contest.id}`}>Your price</label>
         <div className="steps">
           {STEPS.map((s) => (
             <button key={s} type="button" className="step" disabled={disabled} onClick={() => setDraft(String(topBid + s))}>+{s}</button>

@@ -1,6 +1,8 @@
 import { test, expect } from "vitest";
-import { placeBid, openChallenge, forfeit, BidError } from "../domain/war.js";
-import { createRoom, addManager } from "../domain/types.js";
+import { placeBid, openChallenge, forfeit, BidError, REQUOTE_MS } from "../domain/war.js";
+import { createRoom, addManager, type RoomState } from "../domain/types.js";
+import { openListing } from "../domain/listing.js";
+import { finalizeContest } from "../domain/resolution.js";
 import { fixtureSeed } from "./fixtures/roster.js";
 
 function liveRoom() {
@@ -29,13 +31,37 @@ test("a challenge on a rival's owned player opens directly as a war (no listing 
   expect(c.quoteCounts).toEqual({ bar: 1 }); // the opening challenge DOES spend the challenger's quote cap
 });
 
-test("defending the challenge resets the anti-snipe timer", () => {
+test("a challenge opens with the host's full quote timer", () => {
+  const s = liveRoom();
+  const { state, contestId } = openChallenge(s, { managerId: "bar", playerId: "mbappe", amount: 210, now: 0 });
+  expect(state.contests[contestId]!.closesAt).toBe(300_000); // the owner gets the whole 5 minutes to answer
+});
+
+test("defending the challenge resets the clock to 2 minutes, not the full timer", () => {
   const s = liveRoom();
   const { state, contestId } = openChallenge(s, { managerId: "bar", playerId: "mbappe", amount: 210, now: 0 });
   const r = placeBid(state, { contestId, managerId: "real", amount: 230, now: 20 });
   const c = r.contests[contestId]!;
-  expect(c.closesAt).toBe(20 + 300_000); // anti-snipe reset off the new quote
+  expect(c.closesAt).toBe(20 + REQUOTE_MS); // anti-snipe reset off the new quote, but shorter
+  expect(REQUOTE_MS).toBe(120_000);
   expect(c.quotes.at(-1)).toMatchObject({ managerId: "real", amount: 230 });
+});
+
+test("every later quote in the war also gets 2 minutes", () => {
+  const s = liveRoom();
+  const { state, contestId } = openChallenge(s, { managerId: "bar", playerId: "mbappe", amount: 210, now: 0 });
+  let r = placeBid(state, { contestId, managerId: "real", amount: 230, now: 20 });
+  r = placeBid(r, { contestId, managerId: "bar", amount: 250, now: 100 });
+  expect(r.contests[contestId]!.closesAt).toBe(100 + REQUOTE_MS);
+  r = placeBid(r, { contestId, managerId: "city", amount: 270, now: 200 }); // a late arrival too
+  expect(r.contests[contestId]!.closesAt).toBe(200 + REQUOTE_MS);
+});
+
+test("a host timer shorter than 2 minutes is never lengthened by a reply", () => {
+  const s = { ...liveRoom(), quoteTimerMs: 60_000 };
+  const { state, contestId } = openChallenge(s, { managerId: "bar", playerId: "mbappe", amount: 210, now: 0 });
+  const r = placeBid(state, { contestId, managerId: "real", amount: 230, now: 20 });
+  expect(r.contests[contestId]!.closesAt).toBe(20 + 60_000);
 });
 
 test("each manager gets at most two quotes in one contest", () => {
@@ -122,4 +148,42 @@ test("openChallenge rejects challenging a player who already has an open contest
   // two independently-resolving contests on the same player must not coexist.
   expect(() => openChallenge(state, { managerId: "city", playerId: "mbappe", amount: 220, now: 1 }))
     .toThrow(BidError);
+});
+
+test("the first bid on a listing opens the war with the full timer; the reply gets 2 minutes", () => {
+  let s: RoomState = liveRoom();
+  const wirtz = Object.values(s.players).find(p => p.ownerId === null)!;
+  const listed = openListing(s, { managerId: "ars", playerId: wirtz.id, now: 0 });
+  s = listed.state;
+  const id = listed.contestId!;
+  s = placeBid(s, { contestId: id, managerId: "bay", amount: wirtz.listedValue + 5, now: 10 });
+  expect(s.contests[id]!.closesAt).toBe(10 + 300_000);
+  s = placeBid(s, { contestId: id, managerId: "ars", amount: wirtz.listedValue + 10, now: 50 });
+  expect(s.contests[id]!.closesAt).toBe(50 + REQUOTE_MS);
+});
+
+test("a challenge above my current balance is allowed; the money is only checked when the war closes", () => {
+  const s = liveRoom();
+  const poor = { ...s, managers: { ...s.managers, bar: { ...s.managers.bar!, spendable: 50 } } };
+  const { state, contestId } = openChallenge(poor, { managerId: "bar", playerId: "mbappe", amount: 210, now: 0 });
+  expect(state.contests[contestId]!.quotes.at(-1)).toMatchObject({ managerId: "bar", amount: 210 });
+});
+
+test("a reply above my current balance is allowed too", () => {
+  const s = liveRoom();
+  const { state, contestId } = openChallenge(s, { managerId: "bar", playerId: "mbappe", amount: 210, now: 0 });
+  const poorCity = { ...state, managers: { ...state.managers, city: { ...state.managers.city!, spendable: 10 } } };
+  const r = placeBid(poorCity, { contestId, managerId: "city", amount: 400, now: 5 });
+  expect(r.contests[contestId]!.quotes.at(-1)).toMatchObject({ managerId: "city", amount: 400 });
+});
+
+test("winning a war I can't pay for voids it, fines me 25M, and the runner-up gets the player", () => {
+  const s = liveRoom();
+  const { state, contestId } = openChallenge(s, { managerId: "bar", playerId: "mbappe", amount: 210, now: 0 });
+  const poorCity = { ...state, managers: { ...state.managers, city: { ...state.managers.city!, spendable: 10 } } };
+  const bid = placeBid(poorCity, { contestId, managerId: "city", amount: 400, now: 5 });
+  const closed = finalizeContest(bid, contestId, 1_000_000);
+  expect(closed.managers.city!.spendable).toBe(10 - 25);
+  expect(closed.log.some((e) => e.t === "fine" && e.managerId === "city" && e.amount === 25)).toBe(true);
+  expect(closed.players.mbappe!.ownerId).toBe("bar"); // runner-up's 210 stands
 });

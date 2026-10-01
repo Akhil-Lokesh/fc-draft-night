@@ -110,6 +110,18 @@ test("shows the leading bidder's team name (not just the manager) front and cent
   expect(screen.getByText(/Loki/)).toBeTruthy();
 });
 
+test("a war's VS strip already says who leads, so the card drops the separate Leading line", () => {
+  render(
+    <LotCard
+      contest={contest as any} player={player as any} now={0} myId="bay" myQuotesUsed={0} onBid={() => {}}
+      leader={{ displayName: "Loki", clubId: "city" }}
+      sides={{ left: { clubId: "bayern", displayName: "Me", you: true, leading: false }, right: { clubId: "city", displayName: "Loki", you: false, leading: true } } as any}
+    />
+  );
+  expect(screen.queryByText(/^leading$/i)).toBeNull();
+  expect(screen.getByText(/Loki · leading/)).toBeTruthy();
+});
+
 test("an untested listing with no bids yet shows no leading bidder", () => {
   const listing = { ...contest, status: "listing", quotes: [] };
   render(<LotCard contest={listing as any} player={player as any} now={0} myId="bay" myQuotesUsed={0} onBid={() => {}} />);

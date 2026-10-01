@@ -76,7 +76,7 @@ export function Ticker({ log, players, managers }: { log: LogEntry[]; players: P
     .slice(-8)
     .reverse()
     .map(({ e, i }) => describe(e, i, players, managers, names));
-  const items = headlines.length ? headlines.map((h) => h.plain) : ["Transfer window is open", "Every war resets its clock on each bid"];
+  const items = headlines.length ? headlines.map((h) => h.plain) : ["Transfer window is open", "Every reply resets the war to 2 minutes"];
   return (
     <div className="ticker" aria-hidden="true">
       <span className="ticker-badge">Breaking</span>

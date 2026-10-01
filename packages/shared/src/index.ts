@@ -6,4 +6,5 @@ export * from "./domain/analytics.js";
 export * from "./domain/season.js";
 export * from "./domain/search.js";
 export { managersOverBudget } from "./domain/resolution.js";
+export { REQUOTE_MS } from "./domain/war.js";
 export * from "./data/dataset.js";

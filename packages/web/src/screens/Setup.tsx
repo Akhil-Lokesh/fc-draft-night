@@ -162,7 +162,7 @@ export function Setup({
                 </button>
               ))}
             </div>
-            <p className="hint">Each war's countdown. It resets on every bid.</p>
+            <p className="hint">How long the other side has to answer a challenge. Every reply after that gets 2 minutes.</p>
           </div>
         </fieldset>
 
